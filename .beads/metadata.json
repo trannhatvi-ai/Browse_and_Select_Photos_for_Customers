@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "Browse_and_Select_Photos_for_Customers",
+  "project_id": "9c6a08f8-9eed-462b-9a6d-8c7c26fcca82"
+}
