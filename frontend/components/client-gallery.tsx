@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Heart, Camera, ChevronDown, Check, Columns2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -21,8 +21,10 @@ import { mockPhotos } from '@/lib/mock-data'
 type FilterType = 'all' | 'selected' | 'unselected'
 type SortType = 'date' | 'filename'
 
-export function ClientGallery() {
-  const [photos, setPhotos] = useState<Photo[]>(mockPhotos)
+export function ClientGallery({ token }: { token?: string }) {
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [projectData, setProjectData] = useState<any>(null)
   const [filter, setFilter] = useState<FilterType>('all')
   const [sortBy, setSortBy] = useState<SortType>('date')
 
@@ -37,9 +39,38 @@ export function ClientGallery() {
   // Comparison viewer state
   const [comparisonOpen, setComparisonOpen] = useState(false)
 
-  const maxSelections = 15
+  const maxSelections = projectData?.maxSelections || 15
   const selectedCount = photos.filter((p) => p.selected).length
   const progressPercent = (selectedCount / maxSelections) * 100
+
+  useEffect(() => {
+    if (!token) {
+      setPhotos(mockPhotos)
+      setLoading(false)
+      return
+    }
+    fetch(`/api/gallery/${token}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error) {
+          setProjectData(data)
+          const formatted = data.photos.map((p: any) => ({
+            id: p.id,
+            src: p.previewUrl,
+            filename: p.filename,
+            date: data.createdAt,
+            selected: p.selected,
+            comment: p.comment,
+          }))
+          setPhotos(formatted)
+        }
+      })
+      .finally(() => setLoading(false))
+  }, [token])
+
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>
+  }
 
   // Filter and sort photos
   const filteredPhotos = useMemo(() => {
@@ -102,8 +133,27 @@ export function ClientGallery() {
     )
   }
 
-  const handleSubmit = () => {
-    alert(`Đã gửi lựa chọn! ${selectedCount} ảnh đã được chọn.`)
+  const handleSubmit = async () => {
+    if (!token) {
+      alert(`Đã gửi lựa chọn! ${selectedCount} ảnh đã được chọn. (Mock)`)
+      return
+    }
+    
+    try {
+      const selectedIds = photos.filter(p => p.selected).map(p => p.id)
+      const comments = photos.filter(p => p.comment).map(p => ({ id: p.id, comment: p.comment }))
+      
+      const res = await fetch(`/api/gallery/${token}/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedIds, comments })
+      })
+      
+      if (!res.ok) throw new Error('Failed to submit')
+      alert('Đã gửi lựa chọn thành công!')
+    } catch (err) {
+      alert('Có lỗi xảy ra khi gửi lựa chọn.')
+    }
   }
 
   return (
@@ -127,7 +177,7 @@ export function ClientGallery() {
               <Progress value={progressPercent} className="h-2 w-40" />
             </div>
             <span className="text-sm text-muted-foreground">
-              Xin chào, <span className="font-medium text-foreground">Nguyễn Văn A</span>
+              Xin chào, <span className="font-medium text-foreground">{projectData?.clientName || 'Khách hàng'}</span>
             </span>
           </div>
         </div>

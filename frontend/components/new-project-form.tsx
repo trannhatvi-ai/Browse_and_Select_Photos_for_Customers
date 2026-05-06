@@ -16,7 +16,8 @@ interface UploadFile {
   id: string
   name: string
   progress: number
-  status: 'uploading' | 'complete' | 'error'
+  status: 'pending' | 'uploading' | 'complete' | 'error'
+  file: File
 }
 
 export function NewProjectForm() {
@@ -37,6 +38,7 @@ export function NewProjectForm() {
   // Upload state
   const [isDragging, setIsDragging] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -68,31 +70,11 @@ export function NewProjectForm() {
       id: `${Date.now()}-${index}`,
       name: file.name,
       progress: 0,
-      status: 'uploading' as const,
+      status: 'pending',
+      file,
     }))
 
     setUploadFiles((prev) => [...prev, ...newFiles])
-
-    // Simulate upload progress
-    newFiles.forEach((file) => {
-      let progress = 0
-      const interval = setInterval(() => {
-        progress += Math.random() * 20
-        if (progress >= 100) {
-          progress = 100
-          clearInterval(interval)
-          setUploadFiles((prev) =>
-            prev.map((f) =>
-              f.id === file.id ? { ...f, progress: 100, status: 'complete' } : f
-            )
-          )
-        } else {
-          setUploadFiles((prev) =>
-            prev.map((f) => (f.id === file.id ? { ...f, progress } : f))
-          )
-        }
-      }, 200)
-    })
   }
 
   const removeFile = (id: string) => {
@@ -106,11 +88,55 @@ export function NewProjectForm() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would submit to an API
-    alert('Tạo dự án thành công! Link sẽ được gửi đến khách hàng.')
-    router.push('/dashboard')
+    if (isSubmitting) return
+    setIsSubmitting(true)
+
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName,
+          clientEmail,
+          eventName,
+          eventDate,
+          deadline,
+          maxSelections: parseInt(maxSelections, 10),
+          watermarkConfig: { password: accessPassword || undefined, allowDownload, opacity: watermarkOpacity[0] }
+        })
+      })
+
+      if (!res.ok) throw new Error('Failed to create project')
+      const project = await res.json()
+
+      const filesToUpload = uploadFiles.filter(f => f.status !== 'complete')
+      for (const fileItem of filesToUpload) {
+        const formData = new FormData()
+        formData.append('file', fileItem.file)
+        
+        setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'uploading', progress: 50 } : f))
+        
+        const uploadRes = await fetch(`/api/projects/${project.id}/photos`, {
+          method: 'POST',
+          body: formData
+        })
+        
+        if (uploadRes.ok) {
+          setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'complete', progress: 100 } : f))
+        } else {
+          setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'error' } : f))
+        }
+      }
+
+      alert('Tạo dự án thành công! Link sẽ được gửi đến khách hàng.')
+      router.push('/dashboard')
+    } catch (err) {
+      alert('Có lỗi xảy ra: ' + (err as Error).message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -355,8 +381,8 @@ export function NewProjectForm() {
 
       {/* Submit */}
       <div className="flex justify-end">
-        <Button type="submit" size="lg" className="px-8">
-          Lưu & Gửi link cho khách hàng
+        <Button type="submit" size="lg" className="px-8" disabled={isSubmitting}>
+          {isSubmitting ? 'Đang lưu...' : 'Lưu & Gửi link cho khách hàng'}
         </Button>
       </div>
     </form>

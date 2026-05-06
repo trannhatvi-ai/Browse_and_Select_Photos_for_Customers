@@ -3,3 +3,8 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# Python virtual environment (if any)
+.venv/
+venv/
+env/

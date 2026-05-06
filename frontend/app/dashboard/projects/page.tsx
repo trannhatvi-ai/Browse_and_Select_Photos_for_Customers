@@ -2,9 +2,20 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ProjectsTable } from '@/components/projects-table'
-import { mockProjects } from '@/lib/mock-data'
+import { prisma } from '@/lib/db'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+export default async function ProjectsPage() {
+  const session = await getServerSession(authOptions)
+  
+  let projects: any[] = []
+  if (session?.user?.id) {
+    projects = await prisma.project.findMany({
+      where: { createdBy: session.user.id },
+      orderBy: { createdAt: 'desc' }
+    })
+  }
 
-export default function ProjectsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -22,7 +33,7 @@ export default function ProjectsPage() {
         </Button>
       </div>
 
-      <ProjectsTable projects={mockProjects} />
+      <ProjectsTable projects={projects} />
     </div>
   )
 }

@@ -51,22 +51,22 @@
 
 ## Phase 5: Email Integration
 
-- [ ] 5.1 Setup Bull Queue + Redis (hoặc in-memory cho dev)
-- [ ] 5.2 Configure Resend API key
-- [ ] 5.3 Create email templates: project invitation, reminder, selection submitted
-- [ ] 5.4 Implement `POST /api/email/send` internal endpoint
-- [ ] 5.5 Queue email trong project creation flow
-- [ ] 5.6 Background worker processing email queue
-- [ ] 5.7 Write tests: email queued, sent, error handling
+- [x] 5.1 Setup Bull Queue + Redis (hoặc in-memory cho dev)
+- [x] 5.2 Configure Resend API key
+- [x] 5.3 Create email templates: project invitation, reminder, selection submitted
+- [x] 5.4 Implement `POST /api/email/send` internal endpoint
+- [x] 5.5 Queue email trong project creation flow
+- [x] 5.6 Background worker processing email queue
+- [x] 5.7 Write tests: email queued, sent, error handling
 
 ## Phase 6: Frontend-Backend Integration
 
-- [ ] 6.1 Replace `mockPhotos` trong client-gallery.tsx với `fetch('/api/gallery/...')`
-- [ ] 6.2 Update NewProjectForm: submit form data + files to `POST /api/projects`
-- [ ] 6.3 Show upload progress từ API response
-- [ ] 6.4 Update ProjectsTable: fetch từ `/api/projects`
-- [ ] 6.5 Handle errors globally (toast notifications)
-- [ ] 6.6 Write E2E tests (optional, nếu có time)
+- [x] 6.1 Replace `mockPhotos` trong client-gallery.tsx với `fetch('/api/gallery/...')`
+- [x] 6.2 Update NewProjectForm: submit form data + files to `POST /api/projects`
+- [x] 6.3 Show upload progress từ API response
+- [x] 6.4 Update ProjectsTable: fetch từ `/api/projects`
+- [x] 6.5 Handle errors globally (toast notifications)
+- [x] 6.6 Write E2E tests (optional, nếu có time)
 
 ## Phase 7: Polish & Edge Cases
 
