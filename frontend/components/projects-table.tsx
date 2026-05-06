@@ -479,6 +479,20 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
                     <Eye className="mr-1 h-4 w-4" /> Xem
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-11 px-3 text-sm"
+                    title="Copy link gửi khách"
+                    onClick={() => {
+                      if (!project.accessToken) return toast.error('Không có link dự án')
+                      const url = `${window.location.origin}/gallery/${project.accessToken}`
+                      navigator.clipboard.writeText(url)
+                      toast.success('Đã copy link gallery!')
+                    }}
+                  >
+                    <LinkIcon className="mr-1 h-4 w-4" /> Sao chép
+                  </Button>
+                  <Button
                     variant="default"
                     size="sm"
                     className="h-11 px-3 text-sm"
