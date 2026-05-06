@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, X, Image as ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,8 @@ interface UploadFile {
 
 export function NewProjectForm() {
   const router = useRouter()
+  const [existingProjects, setExistingProjects] = useState<Array<{ clientName: string; clientEmail: string }>>([])
+  const autoEmailNameRef = useRef('')
 
   // Form state
   const [clientName, setClientName] = useState('')
@@ -39,6 +41,29 @@ export function NewProjectForm() {
   const [isDragging, setIsDragging] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((projects) => setExistingProjects(projects))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const matchedProject = existingProjects.find(
+      (project) => project.clientName.trim().toLowerCase() === clientName.trim().toLowerCase()
+    )
+
+    if (!matchedProject) {
+      autoEmailNameRef.current = ''
+      return
+    }
+
+    if (!clientEmail || autoEmailNameRef.current === matchedProject.clientName) {
+      setClientEmail(matchedProject.clientEmail)
+      autoEmailNameRef.current = matchedProject.clientName
+    }
+  }, [clientName, clientEmail, existingProjects])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -126,6 +151,15 @@ export function NewProjectForm() {
         if (uploadRes.ok) {
           setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'complete', progress: 100 } : f))
         } else {
+          const errorData = await uploadRes.json()
+          
+          // Kiểm tra lỗi cấu hình Cloudinary
+          if (errorData.error === 'Cloudinary not configured') {
+            setIsSubmitting(false)
+            alert(`${errorData.message}\n\nVui lòng truy cập: /dashboard/settings để cấu hình.`)
+            return
+          }
+          
           setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'error' } : f))
         }
       }
@@ -163,7 +197,10 @@ export function NewProjectForm() {
               id="clientEmail"
               type="email"
               value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
+              onChange={(e) => {
+                autoEmailNameRef.current = ''
+                setClientEmail(e.target.value)
+              }}
               placeholder="email@example.com"
               required
             />

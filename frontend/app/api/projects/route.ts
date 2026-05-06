@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') as any
 
-  const where = status ? { status } : {}
+  // If the user is ADMIN show all projects, otherwise filter to projects created by the studio user
+  const whereBase: any = {}
+  if (status) whereBase.status = status
+  const where = session.user.role === 'ADMIN' ? whereBase : { ...whereBase, createdBy: session.user.id }
 
   const projects = await prisma.project.findMany({
     where,
@@ -27,10 +30,9 @@ export async function GET(req: NextRequest) {
       eventDate: true,
       status: true,
       deadline: true,
-      photoCount: true,
-      selectedCount: true,
       maxSelections: true,
       createdAt: true,
+      accessToken: true,
     },
   })
 
@@ -43,6 +45,7 @@ export async function POST(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  const creatorId = session.user.id
 
   const body = await req.json()
   const {
@@ -52,13 +55,45 @@ export async function POST(req: NextRequest) {
     eventDate,
     deadline,
     maxSelections = 50,
-    status = 'UPLOADING',
+    status = 'CHOOSING',
     watermarkConfig,
   } = body
 
-  if (!clientName || !clientEmail || !eventName || !eventDate || !deadline) {
+  if (status !== 'CHOOSING' && status !== 'DONE') {
+    return NextResponse.json(
+      { error: 'status must be CHOOSING or DONE' },
+      { status: 400 }
+    )
+  }
+
+  if (!clientName || !eventName || !eventDate || !deadline) {
     return NextResponse.json(
       { error: 'Missing required fields' },
+      { status: 400 }
+    )
+  }
+
+  let resolvedClientEmail = clientEmail
+  if (!resolvedClientEmail) {
+    const existingProject = await prisma.project.findFirst({
+      where: {
+        clientName: {
+          equals: clientName,
+          mode: 'insensitive',
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { clientEmail: true },
+    })
+
+    if (existingProject?.clientEmail) {
+      resolvedClientEmail = existingProject.clientEmail
+    }
+  }
+
+  if (!resolvedClientEmail) {
+    return NextResponse.json(
+      { error: 'Vui lòng nhập email khách hàng hoặc dùng tên khách đã tồn tại để tự điền email' },
       { status: 400 }
     )
   }
@@ -69,14 +104,14 @@ export async function POST(req: NextRequest) {
   const project = await prisma.project.create({
     data: {
       clientName,
-      clientEmail,
+      clientEmail: resolvedClientEmail,
       eventName,
       eventDate: new Date(eventDate),
       deadline: new Date(deadline),
       maxSelections,
       status,
       accessToken,
-      createdBy: session.user.id,
+      createdBy: creatorId,
       watermarkConfig,
     },
     select: {
@@ -104,7 +139,7 @@ export async function POST(req: NextRequest) {
         <html>
           <body style="font-family: Geist, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>Your photos are ready!</h2>
-            <p>Hi ${clientName},</p>
+              <p>Hi ${clientName},</p>
             <p>Your <strong>${eventName}</strong> photos are ready for your review.</p>
             <p><a href="${galleryLink}" style="background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Your Gallery</a></p>
             ${watermarkConfig?.password ? `<p><strong>Password:</strong> ${watermarkConfig.password}</p>` : ''}

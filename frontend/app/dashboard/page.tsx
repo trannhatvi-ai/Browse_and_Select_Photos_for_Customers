@@ -11,20 +11,52 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
   
   let projects: any[] = []
+  let allProjects: any[] = []
+  
   if (session?.user?.id) {
-    projects = await prisma.project.findMany({
-      where: { createdBy: session.user.id },
-      orderBy: { createdAt: 'desc' },
-      take: 5
-    })
+    try {
+      if (session.user.role === 'ADMIN') {
+        projects = await prisma.project.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        })
+        allProjects = await prisma.project.findMany({})
+      } else {
+        projects = await prisma.project.findMany({
+          where: { createdBy: session.user.id },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        })
+        allProjects = await prisma.project.findMany({ where: { createdBy: session.user.id } })
+      }
+    } catch (e) {}
   }
 
-  const allProjects = session?.user?.id ? await prisma.project.findMany({ where: { createdBy: session.user.id } }) : []
   const stats = {
     totalProjects: allProjects.length,
-    pendingReview: allProjects.filter(p => p.status === 'CHOOSING' || p.status === 'choosing').length,
-    completed: allProjects.filter(p => p.status === 'DONE' || p.status === 'done').length,
-    storageUsed: '1.2 GB'
+    pendingReview: allProjects.filter(p => p.status === 'CHOOSING').length,
+    completed: allProjects.filter(p => p.status === 'DONE').length,
+    storageUsed: '0 B'
+  }
+
+  // compute storage used (sum of photo.size) for scope (admin: all, studio: own)
+  try {
+    const wherePhoto: any = session?.user?.role === 'ADMIN' ? {} : { project: { createdBy: session?.user?.id } }
+    const agg = await prisma.photo.aggregate({
+      _sum: { size: true },
+      where: wherePhoto,
+    })
+    const bytes = agg._sum.size || 0
+    const human = formatBytes(bytes)
+    stats.storageUsed = human
+  } catch (e) {}
+
+  function formatBytes(bytes: number) {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
   return (
@@ -38,7 +70,7 @@ export default async function DashboardPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/dashboard/new-project">
+          <Link href="/dashboard/projects">
             <Plus className="mr-2 h-4 w-4" />
             Dự án mới
           </Link>

@@ -1,56 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getStorage } from '@/lib/storage'
-import { applyWatermark } from '@/lib/watermark'
-import { randomUUID } from 'crypto'
-import path from 'path'
+import { buildPreviewUrl } from '@/lib/storage'
+import { getCloudinaryCredentialsForProject, validateUserCloudinarySettings } from '@/lib/cloudinary-settings'
+import { v2 as cloudinary } from 'cloudinary'
 
-const storage = getStorage()
-
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id: projectId } = await params
-
-  const photos = await prisma.photo.findMany({
-    where: { projectId },
-    orderBy: { uploadedAt: 'desc' },
-    select: {
-      id: true,
-      filename: true,
-      previewUrl: true,
-      selected: true,
-      comment: true,
-    },
-  })
-
-  return NextResponse.json(photos)
-}
+// Cấu hình Cloudinary
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: projectId } = await params
-
-  // Verify project exists
+  
+  // Lấy thông tin dự án để kiểm tra owner
   const project = await prisma.project.findUnique({
     where: { id: projectId },
+    select: { createdBy: true },
   })
-
+  
   if (!project) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
-
-  if (project.status !== 'UPLOADING') {
+  
+  // Kiểm tra xem user đã cấu hình Cloudinary hay chưa
+  const { isConfigured, missing } = await validateUserCloudinarySettings(project.createdBy)
+  
+  if (!isConfigured) {
     return NextResponse.json(
-      { error: 'Cannot upload photos: project not in UPLOADING status' },
+      {
+        error: 'Cloudinary not configured',
+        message: `Vui lòng cấu hình thông tin Cloudinary trước khi upload ảnh. Thiếu: ${missing?.join(', ')}`,
+        configUrl: '/dashboard/settings'
+      },
       { status: 400 }
     )
   }
+  
+  const credentials = await getCloudinaryCredentialsForProject(projectId)
+  cloudinary.config(credentials)
 
-  // Parse multipart form
   const formData = await req.formData()
   const files = formData.getAll('files') as File[]
 
@@ -61,65 +54,107 @@ export async function POST(
   const uploadedPhotos = []
 
   for (const file of files) {
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      continue
-    }
-
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-
-    // Generate unique filename with project prefix
-    const ext = path.extname(file.name) || '.jpg'
-    const filename = `${randomUUID()}${ext}`
-    const originalPath = `projects/${projectId}/original/${filename}`
-    const previewPath = `projects/${projectId}/preview/${filename}`
+    if (!file.type.startsWith('image/')) continue
 
     try {
-      // Save original
-      await storage.save(originalPath, buffer)
+      const arrayBuffer = await file.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
 
-      // Get watermark config from project
-      const watermarkConfig = project.watermarkConfig || {}
-      const opacity = watermarkConfig.opacity || 30
-      const logoPath = watermarkConfig.logoUrl ? path.join('public', watermarkConfig.logoUrl) : undefined
+      // Upload lên Cloudinary dưới dạng stream
+      const uploadResult = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          {
+            folder: `proofing/${projectId}`,
+            resource_type: 'image',
+          },
+          (error, result) => {
+            if (error) reject(error)
+            else resolve(result)
+          }
+        ).end(buffer)
+      }) as any
 
-      // Generate watermarked preview
-      const previewBuffer = await applyWatermark(buffer, opacity, logoPath)
-      await storage.save(previewPath, previewBuffer)
-
-      // Create DB record
+      // Lưu vào Database
       const photo = await prisma.photo.create({
         data: {
           projectId,
           filename: file.name,
-          originalUrl: originalPath,
-          previewUrl: storage.getUrl(previewPath),
-          width: 0, // TODO: extract from image
-          height: 0,
-          size: buffer.length,
-        },
-        select: {
-          id: true,
-          filename: true,
-          previewUrl: true,
+          originalUrl: uploadResult.public_id, // Lưu Public ID của Cloudinary
+          previewUrl: buildPreviewUrl(uploadResult.public_id, credentials.cloud_name),
+          width: uploadResult.width,
+          height: uploadResult.height,
+          size: uploadResult.bytes,
         },
       })
 
       uploadedPhotos.push(photo)
-
-      // Increment project photo count
-      await prisma.project.update({
-        where: { id: projectId },
-        data: { photoCount: { increment: 1 } },
-      })
     } catch (err) {
-      console.error('Failed to upload file:', file.name, err)
+      console.error('Cloudinary Upload Error:', err)
     }
   }
 
-  return NextResponse.json(
-    { uploaded: uploadedPhotos.length, photos: uploadedPhotos },
-    { status: 201 }
-  )
+  // Không cập nhật photoCount vì field không tồn tại trong schema
+
+  return NextResponse.json({ success: true, uploaded: uploadedPhotos.length })
+}
+
+// DELETE /api/projects/[id]/photos — xóa ảnh từ Cloudinary + DB
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { photoId } = await req.json()
+  const { id: projectId } = await params
+  
+  // Lấy thông tin dự án để kiểm tra owner
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { createdBy: true },
+  })
+  
+  if (!project) {
+    return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+  }
+  
+  // Kiểm tra xem user đã cấu hình Cloudinary hay chưa
+  const { isConfigured } = await validateUserCloudinarySettings(project.createdBy)
+  
+  if (!isConfigured) {
+    return NextResponse.json(
+      {
+        error: 'Cloudinary not configured',
+        message: 'Vui lòng cấu hình thông tin Cloudinary để quản lý ảnh.'
+      },
+      { status: 400 }
+    )
+  }
+  
+  const credentials = await getCloudinaryCredentialsForProject(projectId)
+  cloudinary.config(credentials)
+  
+  if (!photoId) {
+    return NextResponse.json({ error: 'Missing photoId' }, { status: 400 })
+  }
+
+  try {
+    // Lấy thông tin ảnh trước khi xóa
+    const photo = await prisma.photo.findUnique({ where: { id: photoId } })
+    if (!photo) {
+      return NextResponse.json({ error: 'Photo not found' }, { status: 404 })
+    }
+
+    // Xóa trên Cloudinary (originalUrl chứa public_id)
+    try {
+      await cloudinary.uploader.destroy(photo.originalUrl)
+    } catch (err) {
+      console.error('Cloudinary delete error:', err)
+    }
+
+    // Xóa trong Database
+    await prisma.photo.delete({ where: { id: photoId } })
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }

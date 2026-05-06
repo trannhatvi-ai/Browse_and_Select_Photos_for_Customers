@@ -6,18 +6,26 @@ import bcrypt from 'bcryptjs'
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: 'Credentials',
+      name: 'Studio Admin',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        identifier: { label: 'Email / Username / Số điện thoại', type: 'text', placeholder: 'admin / 090...' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        if (!credentials?.identifier || !credentials?.password) {
           return null
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+        const identifier = credentials.identifier.trim()
+
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email: identifier },
+              { username: identifier },
+              { phone: identifier },
+            ],
+          },
         })
 
         if (!user || !user.password) {
@@ -37,6 +45,8 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
+          username: user.username,
+          phone: user.phone,
           role: user.role,
         }
       },
@@ -44,8 +54,8 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     session({ token, session }) {
-      if (token) {
-        session.user.id = token.sub
+      if (token && session.user) {
+        session.user.id = token.sub as string
         session.user.role = token.role as string
       }
       return session
@@ -58,10 +68,9 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: '/login', // optional custom login page
-  },
-  session: {
+    signIn: '/login',
+  },  session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  secret: process.env.NEXTAUTH_SECRET,
 }

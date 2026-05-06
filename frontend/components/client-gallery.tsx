@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Heart, Camera, ChevronDown, Check, Columns2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -22,8 +23,9 @@ type FilterType = 'all' | 'selected' | 'unselected'
 type SortType = 'date' | 'filename'
 
 export function ClientGallery({ token }: { token?: string }) {
+  const router = useRouter()
   const [photos, setPhotos] = useState<Photo[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!!token)
   const [projectData, setProjectData] = useState<any>(null)
   const [filter, setFilter] = useState<FilterType>('all')
   const [sortBy, setSortBy] = useState<SortType>('date')
@@ -44,33 +46,34 @@ export function ClientGallery({ token }: { token?: string }) {
   const progressPercent = (selectedCount / maxSelections) * 100
 
   useEffect(() => {
-    if (!token) {
-      setPhotos(mockPhotos)
-      setLoading(false)
-      return
-    }
+    if (!token) return
+
     fetch(`/api/gallery/${token}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.error) {
-          setProjectData(data)
-          const formatted = data.photos.map((p: any) => ({
-            id: p.id,
-            src: p.previewUrl,
-            filename: p.filename,
-            date: data.createdAt,
-            selected: p.selected,
-            comment: p.comment,
-          }))
-          setPhotos(formatted)
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data.error || 'Mã truy cập không hợp lệ')
         }
+        return data
+      })
+      .then((data) => {
+        setProjectData(data)
+        const formatted = data.photos.map((p: any) => ({
+          id: p.id,
+          src: p.previewUrl,
+          filename: p.filename,
+          date: p.uploadedAt,
+          selected: p.selected,
+          comment: p.comment,
+        }))
+        setPhotos(formatted)
+      })
+      .catch((err) => {
+        alert(err.message)
+        router.push('/')
       })
       .finally(() => setLoading(false))
   }, [token])
-
-  if (loading) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>
-  }
 
   // Filter and sort photos
   const filteredPhotos = useMemo(() => {
@@ -93,6 +96,10 @@ export function ClientGallery({ token }: { token?: string }) {
 
     return result
   }, [photos, filter, sortBy])
+
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>
+  }
 
   const handleSelect = (id: string) => {
     setPhotos((prev) =>
@@ -140,13 +147,14 @@ export function ClientGallery({ token }: { token?: string }) {
     }
     
     try {
-      const selectedIds = photos.filter(p => p.selected).map(p => p.id)
-      const comments = photos.filter(p => p.comment).map(p => ({ id: p.id, comment: p.comment }))
+      const selections = photos
+        .filter(p => p.selected)
+        .map(p => ({ id: p.id, comment: p.comment }))
       
       const res = await fetch(`/api/gallery/${token}/select`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectedIds, comments })
+        body: JSON.stringify({ selections })
       })
       
       if (!res.ok) throw new Error('Failed to submit')

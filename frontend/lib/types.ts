@@ -13,11 +13,12 @@ export interface Project {
   clientEmail: string
   eventName: string
   eventDate: string
-  status: 'uploading' | 'choosing' | 'done'
+  status: 'CHOOSING' | 'DONE'
   deadline: string
   photoCount: number
   selectedCount: number
   maxSelections: number
+  accessToken?: string
 }
 
 export interface StatsData {

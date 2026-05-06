@@ -1,4 +1,4 @@
-import { DELETE } from './route'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getStorage } from '@/lib/storage'
 

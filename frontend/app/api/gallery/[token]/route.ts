@@ -26,7 +26,10 @@ export async function GET(
   })
 
   if (!project) {
-    return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Không tìm thấy dự án với mã truy cập này. Vui lòng kiểm tra lại.' },
+      { status: 404 }
+    )
   }
 
   // Check password if required

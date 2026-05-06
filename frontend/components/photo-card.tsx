@@ -41,39 +41,40 @@ export function PhotoCard({ photo, onSelect, onComment, onOpen }: PhotoCardProps
         <div className="absolute inset-0 animate-pulse bg-muted" />
       )}
 
-      {/* Watermark */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+      {/* Watermark - Layer thấp hơn nút */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden z-10">
         <span
           className="text-4xl font-bold tracking-widest text-white/20 select-none"
           style={{ transform: 'rotate(-30deg)' }}
         >
-          MẪU
+          PROOFS
         </span>
       </div>
 
-      {/* Selection indicator */}
+      {/* Selection indicator - Layer 20 */}
       {photo.selected && (
-        <div className="absolute top-3 left-3 flex h-6 w-6 items-center justify-center rounded-full bg-accent">
+        <div className="absolute top-3 left-3 flex h-6 w-6 items-center justify-center rounded-full bg-accent z-20">
           <Heart className="h-3.5 w-3.5 fill-white text-white" />
         </div>
       )}
 
-      {/* Comment indicator */}
+      {/* Comment indicator - Layer 20 */}
       {photo.comment && (
-        <div className="absolute top-3 right-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary">
+        <div className="absolute top-3 right-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary z-20">
           <MessageCircle className="h-3.5 w-3.5 fill-white text-white" />
         </div>
       )}
 
-      {/* Hover actions */}
+      {/* Hover actions - Layer 30 (Cao nhất) */}
       <div
         className={cn(
-          'absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-3 pt-10 transition-opacity duration-200',
-          isHovered ? 'opacity-100' : 'opacity-0 md:opacity-0',
-          'md:group-hover:opacity-100'
+          'absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 pt-12 transition-all duration-300 z-30',
+          'opacity-0 group-hover:opacity-100'
         )}
       >
-        <span className="text-xs font-medium text-white/80">{photo.filename}</span>
+        <span className="text-xs font-medium text-white truncate max-w-[150px] drop-shadow-md">
+          {photo.filename}
+        </span>
         <div className="flex items-center gap-2">
           <button
             onClick={(e) => {
@@ -81,14 +82,14 @@ export function PhotoCard({ photo, onSelect, onComment, onOpen }: PhotoCardProps
               onSelect(photo.id)
             }}
             className={cn(
-              'flex h-9 w-9 items-center justify-center rounded-full transition-colors',
+              'flex h-10 w-10 items-center justify-center rounded-full transition-all active:scale-90',
               photo.selected
-                ? 'bg-accent text-white'
-                : 'bg-white/20 text-white hover:bg-white/30'
+                ? 'bg-accent text-white shadow-lg'
+                : 'bg-white/20 text-white hover:bg-white/40 backdrop-blur-sm'
             )}
             aria-label={photo.selected ? 'Bỏ chọn ảnh' : 'Chọn ảnh'}
           >
-            <Heart className={cn('h-4 w-4', photo.selected && 'fill-current')} />
+            <Heart className={cn('h-5 w-5', photo.selected && 'fill-current')} />
           </button>
           <button
             onClick={(e) => {
@@ -96,14 +97,14 @@ export function PhotoCard({ photo, onSelect, onComment, onOpen }: PhotoCardProps
               onComment(photo.id)
             }}
             className={cn(
-              'flex h-9 w-9 items-center justify-center rounded-full transition-colors',
+              'flex h-10 w-10 items-center justify-center rounded-full transition-all active:scale-90',
               photo.comment
-                ? 'bg-primary text-white'
-                : 'bg-white/20 text-white hover:bg-white/30'
+                ? 'bg-primary text-white shadow-lg'
+                : 'bg-white/20 text-white hover:bg-white/40 backdrop-blur-sm'
             )}
             aria-label="Thêm ghi chú"
           >
-            <MessageCircle className={cn('h-4 w-4', photo.comment && 'fill-current')} />
+            <MessageCircle className={cn('h-5 w-5', photo.comment && 'fill-current')} />
           </button>
         </div>
       </div>

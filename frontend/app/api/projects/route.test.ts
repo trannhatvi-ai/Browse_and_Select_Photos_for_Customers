@@ -67,7 +67,7 @@ describe('Projects API', () => {
         eventDate: new Date('2024-12-01'),
         deadline: new Date('2024-12-15'),
         maxSelections: 30,
-        status: 'UPLOADING',
+        status: 'CHOOSING',
         accessToken: 'abc123',
         createdBy: 'user-1',
         createdAt: new Date(),

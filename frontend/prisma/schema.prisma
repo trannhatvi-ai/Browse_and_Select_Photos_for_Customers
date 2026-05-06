@@ -14,9 +14,14 @@ model User {
   id           String    @id @default(cuid())
   email        String    @unique
   name         String
+  username     String?   @unique
+  phone        String?   @unique
   password     String?   // hashed bcrypt for admin; null for client access via token
   role         Role      @default(STUDIO)
+  passwordResetToken      String?
+  passwordResetExpires     DateTime?
   projects     Project[]
+  settings     Settings?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
@@ -29,7 +34,7 @@ model Project {
   eventDate       DateTime
   deadline        DateTime
   maxSelections   Int         @default(50)
-  status          ProjectStatus @default(UPLOADING)
+  status          ProjectStatus @default(CHOOSING)
   watermarkConfig Json?       // { opacity: number, logoUrl: string }
   accessToken     String      @unique
   accessPassword  String?
@@ -53,6 +58,7 @@ model Photo {
   size        Int        // bytes
   selected    Boolean    @default(false)
   comment     String?
+  selections  Selection[]
   uploadedAt  DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
@@ -69,12 +75,27 @@ model Selection {
 }
 
 enum Role {
+  ADMIN
   STUDIO
   CLIENT
 }
 
 enum ProjectStatus {
-  UPLOADING   // Studio đang upload ảnh
   CHOOSING    // Client đang chọn ảnh
   DONE        // Selection submitted, hoàn thành
+}
+
+model Settings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studioName      String   @default("STUDIO")
+  phone           String?
+  email           String?
+  cloudinaryCloudName String?
+  cloudinaryApiKey    String?
+  cloudinaryApiSecret String?
+  watermarkText   String   @default("PROOFS")
+  watermarkOpacity Int     @default(30)
+  updatedAt       DateTime @updatedAt
 }

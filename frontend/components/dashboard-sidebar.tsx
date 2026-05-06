@@ -5,26 +5,31 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   FolderOpen,
+  UserRound,
   Users,
   Settings,
   LogOut,
   Camera,
+  Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { signOut } from 'next-auth/react'
 
-const navItems = [
-  { href: '/dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard },
-  { href: '/dashboard/projects', label: 'Dự án', icon: FolderOpen },
-  { href: '/dashboard/clients', label: 'Khách hàng', icon: Users },
-  { href: '/dashboard/settings', label: 'Cài đặt', icon: Settings },
+const baseNavItems = [
+  { href: '/dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard, roles: ['ADMIN', 'STUDIO'] },
+  { href: '/dashboard/projects', label: 'Dự án', icon: FolderOpen, roles: ['ADMIN', 'STUDIO'] },
+  { href: '/dashboard/clients', label: 'Khách hàng', icon: UserRound, roles: ['ADMIN', 'STUDIO'] },
+  { href: '/dashboard/users', label: 'Người dùng', icon: Shield, roles: ['ADMIN'] },
+  { href: '/dashboard/settings', label: 'Cài đặt', icon: Settings, roles: ['ADMIN', 'STUDIO'] },
 ]
 
-export function DashboardSidebar() {
+export function DashboardSidebar({ userRole = 'STUDIO', userName, userEmail }: { userRole?: string, userName?: string | null, userEmail?: string | null }) {
   const pathname = usePathname()
+
+  const navItems = baseNavItems.filter(item => item.roles.includes(userRole))
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar text-sidebar-foreground">
-      {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
         <Camera className="h-6 w-6" />
         <span className="text-lg font-semibold">Studio Pro</span>
@@ -33,7 +38,7 @@ export function DashboardSidebar() {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-4">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`))
           return (
             <Link
               key={item.href}
@@ -52,9 +57,16 @@ export function DashboardSidebar() {
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="border-t border-sidebar-border p-4">
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground">
+      {/* User info + Logout */}
+      <div className="border-t border-sidebar-border p-4 space-y-2">
+        <div className="px-3 py-1.5">
+          <p className="text-xs font-medium truncate">{userName || userEmail || 'Người dùng'}</p>
+          <p className="text-[10px] text-sidebar-foreground/50">{userRole === 'ADMIN' ? 'Quản trị viên' : 'Chủ Studio'}</p>
+        </div>
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+        >
           <LogOut className="h-5 w-5" />
           Đăng xuất
         </button>
