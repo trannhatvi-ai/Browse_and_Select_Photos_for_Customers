@@ -245,7 +245,7 @@ export function ClientGallery({ token }: { token?: string }) {
       </header>
 
       {/* Filter Bar */}
-      <div className="sticky top-16 z-30 border-b border-border/70 bg-card/90 backdrop-blur-xl supports-[backdrop-filter]:bg-card/75 shadow-[0_12px_30px_-24px_rgba(0,0,0,0.45)]">
+      <div className="sticky top-16 z-30 border-b border-border/60 bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/70">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:overflow-visible lg:pb-0">
             <Button
@@ -254,10 +254,10 @@ export function ClientGallery({ token }: { token?: string }) {
               onClick={() => setFilter('all')}
               aria-pressed={filter === 'all'}
               className={cn(
-                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200',
+                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200 border',
                 filter === 'all'
-                  ? 'bg-foreground text-background shadow-md shadow-foreground/15 hover:bg-foreground/90'
-                  : 'border-border/80 bg-background/80 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground'
+                  ? 'border-foreground bg-foreground text-background hover:bg-foreground/90'
+                  : 'border-border/60 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground'
               )}
             >
               Tất cả ảnh
@@ -268,13 +268,13 @@ export function ClientGallery({ token }: { token?: string }) {
               onClick={() => setFilter('selected')}
               aria-pressed={filter === 'selected'}
               className={cn(
-                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200 gap-1.5',
+                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200 gap-1.5 border',
                 filter === 'selected'
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20 hover:bg-rose-600/90'
-                  : 'border-border/80 bg-background/80 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground'
+                  ? 'border-foreground bg-foreground text-background hover:bg-foreground/90'
+                  : 'border-border/60 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground'
               )}
             >
-              <Heart className={cn('h-3.5 w-3.5 transition-transform', filter === 'selected' && 'fill-current scale-110')} />
+              <Heart className={cn('h-3.5 w-3.5 transition-transform', filter === 'selected' && 'fill-current')} />
               Đã chọn
             </Button>
             <Button
@@ -283,10 +283,10 @@ export function ClientGallery({ token }: { token?: string }) {
               onClick={() => setFilter('unselected')}
               aria-pressed={filter === 'unselected'}
               className={cn(
-                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200',
+                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200 border',
                 filter === 'unselected'
-                  ? 'bg-foreground text-background shadow-md shadow-foreground/15 hover:bg-foreground/90'
-                  : 'border-border/80 bg-background/80 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground'
+                  ? 'border-foreground bg-foreground text-background hover:bg-foreground/90'
+                  : 'border-border/60 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground'
               )}
             >
               Chưa chọn
@@ -301,7 +301,7 @@ export function ClientGallery({ token }: { token?: string }) {
               onClick={() => setComparisonOpen(true)}
               disabled={filteredPhotos.length < 2}
               className={cn(
-                'h-9 shrink-0 rounded-full border-border/80 bg-background/80 px-4 text-sm font-medium shadow-sm transition-all duration-200 gap-1.5 hover:bg-muted hover:text-foreground',
+                'h-9 shrink-0 rounded-full border-border/60 bg-transparent px-4 text-sm font-medium transition-all duration-200 gap-1.5 hover:border-border hover:bg-muted/40 hover:text-foreground',
                 filteredPhotos.length < 2 && 'opacity-60'
               )}
             >
@@ -315,7 +315,7 @@ export function ClientGallery({ token }: { token?: string }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 shrink-0 min-w-[128px] justify-between rounded-full border-border/80 bg-background/80 px-4 text-sm font-medium shadow-sm transition-all duration-200 gap-2 hover:bg-muted hover:text-foreground"
+                  className="h-9 shrink-0 min-w-[128px] justify-between rounded-full border-border/60 bg-transparent px-4 text-sm font-medium transition-all duration-200 gap-2 hover:border-border hover:bg-muted/40 hover:text-foreground"
                 >
                   <span className="hidden sm:inline">Sắp xếp: {sortBy === 'date' ? 'Ngày' : 'Tên file'}</span>
                   <span className="inline sm:hidden">Sắp xếp</span>
