@@ -1,0 +1,15 @@
+# OpenSpec Configuration
+profile: core
+tools:
+  - kilocode
+
+# Change settings
+changes:
+  auto-archive: false
+  require-approval: true
+
+# Spec settings
+specs:
+  require-design: true
+  require-tasks: true
+  delta-mode: true
