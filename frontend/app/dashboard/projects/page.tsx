@@ -5,8 +5,6 @@ import { Plus, Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Slider } from '@/components/ui/slider'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -41,8 +39,7 @@ export default function ProjectsPage() {
   const [eventDate, setEventDate] = useState('')
   const [maxSelections, setMaxSelections] = useState('50')
   const [deadline, setDeadline] = useState('')
-  const [allowDownload, setAllowDownload] = useState(false)
-  const [watermarkOpacity, setWatermarkOpacity] = useState([30])
+  
 
   // Upload state
   const [isDragging, setIsDragging] = useState(false)
@@ -78,8 +75,6 @@ export default function ProjectsPage() {
     setEventDate('')
     setMaxSelections('50')
     setDeadline('')
-    setAllowDownload(false)
-    setWatermarkOpacity([30])
     setUploadFiles([])
   }
 
@@ -135,8 +130,7 @@ export default function ProjectsPage() {
           eventName,
           eventDate,
           deadline,
-          maxSelections: parseInt(maxSelections, 10),
-          watermarkConfig: { allowDownload, opacity: watermarkOpacity[0] }
+          maxSelections: parseInt(maxSelections, 10)
         })
       })
 
@@ -246,19 +240,7 @@ export default function ProjectsPage() {
                   <Label htmlFor="s-maxSelections">Số ảnh tối đa</Label>
                   <Input id="s-maxSelections" type="number" min="1" max="500" value={maxSelections} onChange={e => setMaxSelections(e.target.value)} required />
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="s-allowDownload" className="text-sm">Cho phép tải ảnh có watermark</Label>
-                  </div>
-                  <Switch id="s-allowDownload" checked={allowDownload} onCheckedChange={setAllowDownload} />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label>Độ mờ Watermark</Label>
-                    <span className="text-xs text-muted-foreground">{watermarkOpacity[0]}%</span>
-                  </div>
-                  <Slider value={watermarkOpacity} onValueChange={setWatermarkOpacity} min={10} max={80} step={5} />
-                </div>
+                {/* Watermark controls removed - Cloudinary handles watermarking */}
               </div>
 
               <Separator />

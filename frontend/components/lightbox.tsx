@@ -108,16 +108,6 @@ export function Lightbox({
           className="max-h-[85vh] max-w-[90vw] object-contain"
           crossOrigin="anonymous"
         />
-
-        {/* Watermark */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span
-            className="text-6xl font-bold tracking-widest text-white/15 select-none"
-            style={{ transform: 'rotate(-30deg)' }}
-          >
-            MẪU
-          </span>
-        </div>
       </div>
 
       {/* Bottom bar */}

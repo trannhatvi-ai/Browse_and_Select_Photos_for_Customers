@@ -2,12 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, X, Image as ImageIcon } from 'lucide-react'
+import { Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Slider } from '@/components/ui/slider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
@@ -33,9 +31,6 @@ export function NewProjectForm() {
   const [eventDate, setEventDate] = useState('')
   const [maxSelections, setMaxSelections] = useState('50')
   const [deadline, setDeadline] = useState('')
-  const [allowDownload, setAllowDownload] = useState(false)
-  const [watermarkOpacity, setWatermarkOpacity] = useState([30])
-  const [watermarkLogo, setWatermarkLogo] = useState<File | null>(null)
 
   // Upload state
   const [isDragging, setIsDragging] = useState(false)
@@ -106,13 +101,6 @@ export function NewProjectForm() {
     setUploadFiles((prev) => prev.filter((f) => f.id !== id))
   }
 
-  const handleWatermarkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setWatermarkLogo(file)
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isSubmitting) return
@@ -128,8 +116,7 @@ export function NewProjectForm() {
           eventName,
           eventDate,
           deadline,
-          maxSelections: parseInt(maxSelections, 10),
-          watermarkConfig: { password: accessPassword || undefined, allowDownload, opacity: watermarkOpacity[0] }
+          maxSelections: parseInt(maxSelections, 10)
         })
       })
 
@@ -279,73 +266,6 @@ export function NewProjectForm() {
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
               required
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="allowDownload">Cho phép tải ảnh có watermark</Label>
-              <p className="text-xs text-muted-foreground">
-                Cho phép khách hàng tải ảnh xem trước có watermark
-              </p>
-            </div>
-            <Switch
-              id="allowDownload"
-              checked={allowDownload}
-              onCheckedChange={setAllowDownload}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Watermark Setup */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Cài đặt Watermark</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label>Logo Studio</Label>
-            <div className="flex items-center gap-4">
-              {watermarkLogo ? (
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2">
-                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{watermarkLogo.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => setWatermarkLogo(null)}
-                    className="ml-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                  <Upload className="h-4 w-4" />
-                  Tải lên Logo
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleWatermarkUpload}
-                    className="hidden"
-                  />
-                </label>
-              )}
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Độ mờ Watermark</Label>
-              <span className="text-sm text-muted-foreground">
-                {watermarkOpacity[0]}%
-              </span>
-            </div>
-            <Slider
-              value={watermarkOpacity}
-              onValueChange={setWatermarkOpacity}
-              min={10}
-              max={80}
-              step={5}
-              className="w-full"
             />
           </div>
         </CardContent>

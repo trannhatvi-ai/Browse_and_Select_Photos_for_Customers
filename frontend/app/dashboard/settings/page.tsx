@@ -26,8 +26,6 @@ export default function SettingsPage() {
   const [cloudinaryCloudName, setCloudinaryCloudName] = useState('')
   const [cloudinaryApiKey, setCloudinaryApiKey] = useState('')
   const [cloudinaryApiSecret, setCloudinaryApiSecret] = useState('')
-  const [watermarkText, setWatermarkText] = useState('PROOFS')
-  const [watermarkOpacity, setWatermarkOpacity] = useState(30)
 
   useEffect(() => {
     fetch('/api/settings')
@@ -39,8 +37,6 @@ export default function SettingsPage() {
         setCloudinaryCloudName(data.cloudinaryCloudName || '')
         setCloudinaryApiKey(data.cloudinaryApiKey || '')
         setCloudinaryApiSecret(data.cloudinaryApiSecret || '')
-        setWatermarkText(data.watermarkText || 'PROOFS')
-        setWatermarkOpacity(data.watermarkOpacity || 30)
         setLoading(false)
       })
   }, [])
@@ -56,9 +52,7 @@ export default function SettingsPage() {
         email,
         cloudinaryCloudName,
         cloudinaryApiKey,
-        cloudinaryApiSecret,
-        watermarkText,
-        watermarkOpacity
+        cloudinaryApiSecret
       })
     })
     
@@ -146,23 +140,6 @@ export default function SettingsPage() {
             <Button type="button" variant="outline" onClick={handleTestCloudinary} className="gap-2">
               <FlaskConical className="h-4 w-4" /> Test Cloudinary
             </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Cấu hình Watermark</CardTitle>
-            <CardDescription>Cài đặt chữ đóng dấu mặc định trên ảnh mẫu</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="watermark">Nội dung chữ (Text)</Label>
-              <Input id="watermark" value={watermarkText} onChange={(e) => setWatermarkText(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="opacity">Độ mờ (Opacity %)</Label>
-              <Input id="opacity" type="number" value={watermarkOpacity} onChange={(e) => setWatermarkOpacity(parseInt(e.target.value))} />
-            </div>
           </CardContent>
         </Card>
 

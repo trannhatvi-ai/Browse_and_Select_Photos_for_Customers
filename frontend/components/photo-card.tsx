@@ -41,16 +41,6 @@ export function PhotoCard({ photo, onSelect, onComment, onOpen }: PhotoCardProps
         <div className="absolute inset-0 animate-pulse bg-muted" />
       )}
 
-      {/* Watermark - Layer thấp hơn nút */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden z-10">
-        <span
-          className="text-4xl font-bold tracking-widest text-white/20 select-none"
-          style={{ transform: 'rotate(-30deg)' }}
-        >
-          PROOFS
-        </span>
-      </div>
-
       {/* Selection indicator - Layer 20 */}
       {photo.selected && (
         <div className="absolute top-3 left-3 flex h-6 w-6 items-center justify-center rounded-full bg-accent z-20">

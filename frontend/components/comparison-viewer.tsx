@@ -140,15 +140,7 @@ export function ComparisonViewer({
               className="max-h-[70vh] max-w-full object-contain"
               crossOrigin="anonymous"
             />
-            {/* Watermark */}
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span
-                className="text-4xl font-bold tracking-widest text-white/15 select-none"
-                style={{ transform: 'rotate(-30deg)' }}
-              >
-                PROOFS
-              </span>
-            </div>
+
           </div>
         </div>
 
