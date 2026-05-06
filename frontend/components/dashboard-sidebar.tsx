@@ -29,7 +29,7 @@ export function DashboardSidebar({ userRole = 'STUDIO', userName, userEmail }: {
   const navItems = baseNavItems.filter(item => item.roles.includes(userRole))
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar text-sidebar-foreground">
+    <aside className="hidden md:flex fixed inset-y-0 left-0 z-50 w-64 flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
         <Camera className="h-6 w-6" />
         <span className="text-lg font-semibold">Studio Pro</span>

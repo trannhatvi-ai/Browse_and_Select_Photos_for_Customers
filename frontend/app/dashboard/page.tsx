@@ -60,7 +60,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -69,8 +69,9 @@ export default async function DashboardPage() {
             Quản lý các dự án chọn ảnh của bạn
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/projects">
+        {/* Desktop button only */}
+        <Button asChild className="hidden md:flex">
+          <Link href="/dashboard/new-project">
             <Plus className="mr-2 h-4 w-4" />
             Dự án mới
           </Link>
@@ -80,11 +81,18 @@ export default async function DashboardPage() {
       {/* Stats */}
       <StatsCards stats={stats} />
 
-      {/* Projects Table */}
+      {/* Projects Section */}
       <div>
         <h2 className="mb-4 text-lg font-medium text-foreground">Dự án gần đây</h2>
         <ProjectsTable projects={projects} />
       </div>
+
+      {/* Mobile FAB - Floating Action Button */}
+      <Button asChild size="icon" className="md:hidden fixed bottom-24 right-4 z-50 h-14 w-14 rounded-full shadow-lg">
+        <Link href="/dashboard/new-project">
+          <Plus className="h-6 w-6" />
+        </Link>
+      </Button>
     </div>
   )
 }

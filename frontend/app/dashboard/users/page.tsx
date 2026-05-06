@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Shield, Camera, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Shield, Camera, Loader2, Mail, Phone, Calendar, Hash, MoreHorizontal, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,6 +29,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Table,
   TableBody,
   TableCell,
@@ -51,6 +57,8 @@ interface UserItem {
 export default function UsersPage() {
   const [users, setUsers] = useState<UserItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserItem | null>(null)
   const [saving, setSaving] = useState(false)
@@ -80,6 +88,16 @@ export default function UsersPage() {
   }
 
   useEffect(() => { fetchUsers() }, [])
+
+  const filteredUsers = useMemo(() => {
+    if (!search.trim()) return users
+    const q = search.toLowerCase()
+    return users.filter(u =>
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.username?.toLowerCase().includes(q)
+    )
+  }, [users, search])
 
   const openCreate = () => {
     setEditingUser(null)
@@ -160,64 +178,147 @@ export default function UsersPage() {
           <h1 className="text-2xl font-semibold">Quản lý người dùng</h1>
           <p className="text-sm text-muted-foreground mt-1">Thêm, sửa, xóa tài khoản và phân quyền</p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Thêm người dùng
-        </Button>
+        <div className="relative w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Tìm theo tên, email..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : users.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              Chưa có người dùng nào
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tên</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>SĐT</TableHead>
-                  <TableHead>Vai trò</TableHead>
-                  <TableHead className="text-center">Dự án</TableHead>
-                  <TableHead className="text-center">Ngày tạo</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+      {/* Desktop Table */}
+      <div className="hidden md:block rounded-lg border border-border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tên</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Username</TableHead>
+              <TableHead>SĐT</TableHead>
+              <TableHead>Vai trò</TableHead>
+              <TableHead className="text-center">Dự án</TableHead>
+              <TableHead className="text-center">Ngày tạo</TableHead>
+              <TableHead className="text-right">Thao tác</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                </TableCell>
+              </TableRow>
+            ) : filteredUsers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                  Không tìm thấy người dùng
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.username}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.phone}</TableCell>
+                  <TableCell>{roleBadge(user.role)}</TableCell>
+                  <TableCell className="text-center">{user._count.projects}</TableCell>
+                  <TableCell className="text-center text-muted-foreground text-sm">
+                    {new Date(user.createdAt).toLocaleDateString('vi-VN')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(user)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(user)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                    <TableCell className="text-muted-foreground">{user.username}</TableCell>
-                    <TableCell className="text-muted-foreground">{user.phone}</TableCell>
-                    <TableCell>{roleBadge(user.role)}</TableCell>
-                    <TableCell className="text-center">{user._count.projects}</TableCell>
-                    <TableCell className="text-center text-muted-foreground text-sm">
-                      {new Date(user.createdAt).toLocaleDateString('vi-VN')}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(user)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(user)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ) : filteredUsers.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Shield className="h-12 w-12 mb-3 opacity-50" />
+              <p>Không tìm thấy người dùng</p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredUsers.map((user) => (
+            <Card key={user.id} className="group">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <Shield className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="truncate text-base">{user.name}</CardTitle>
+                      <CardDescription className="truncate">{user.email}</CardDescription>
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEdit(user)}>
+                        <Pencil className="mr-2 h-4 w-4" /> Sửa
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => setDeleteTarget(user)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Xóa
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-2">
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Hash className="h-3.5 w-3.5" />
+                    {user.username || '-'}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5" />
+                    {user.phone || '-'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{user._count.projects} dự án</span>
+                  {roleBadge(user.role)}
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-2 border-t">
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span>Tạo: {new Date(user.createdAt).toLocaleDateString('vi-VN')}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
