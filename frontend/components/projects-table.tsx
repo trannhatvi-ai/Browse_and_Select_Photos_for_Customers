@@ -76,6 +76,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
   const [maxSelectionsDraft, setMaxSelectionsDraft] = useState('')
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null)
   const [deletePhotoTarget, setDeletePhotoTarget] = useState<{ photoId: string; filename: string } | null>(null)
+  const [exportLoadingIds, setExportLoadingIds] = useState<string[]>([])
 
   // Desktop-only state
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
@@ -401,18 +402,30 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
                           className="h-8 w-8 bg-green-600 hover:bg-green-700"
                           title="Tải danh sách ảnh khách chọn"
                           onClick={async () => {
-                            const res = await fetch(`/api/projects/${project.id}/export`)
-                            if (!res.ok) return toast.error('Không có ảnh nào được chọn!')
-                            const blob = await res.blob()
-                            const url = window.URL.createObjectURL(blob)
-                            const a = document.createElement('a')
-                            a.href = url
-                            a.download = `Selected_Photos_${project.clientName}.txt`
-                            a.click()
-                            toast.success('Đã tải xuống danh sách!')
+                            if (exportLoadingIds.includes(project.id)) return
+                            setExportLoadingIds(prev => [...prev, project.id])
+                            try {
+                              const res = await fetch(`/api/projects/${project.id}/export`)
+                              if (!res.ok) return toast.error('Không có ảnh nào được chọn!')
+                              const blob = await res.blob()
+                              const url = window.URL.createObjectURL(blob)
+                              const a = document.createElement('a')
+                              a.href = url
+                              a.download = `Selected_Photos_${project.clientName}.txt`
+                              a.click()
+                              toast.success('Đã tải xuống danh sách!')
+                            } catch (e) {
+                              toast.error('Lỗi khi tải xuống')
+                            } finally {
+                              setExportLoadingIds(prev => prev.filter(id => id !== project.id))
+                            }
                           }}
                         >
-                          <Download className="h-4 w-4" />
+                          {exportLoadingIds.includes(project.id) ? (
+                            <div className="h-4 w-4 rounded-full border-b-2 border-white animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleViewProject(project.id)}>
                           <Eye className="mr-1.5 h-4 w-4" /> Xem
@@ -497,18 +510,30 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
                     size="sm"
                     className="h-11 px-3 text-sm"
                     onClick={async () => {
-                      const res = await fetch(`/api/projects/${project.id}/export`)
-                      if (!res.ok) return toast.error('Không có ảnh nào được chọn!')
-                      const blob = await res.blob()
-                      const url = window.URL.createObjectURL(blob)
-                      const a = document.createElement('a')
-                      a.href = url
-                      a.download = `Selected_Photos_${project.clientName}.txt`
-                      a.click()
-                      toast.success('Đã tải xuống danh sách!')
+                      if (exportLoadingIds.includes(project.id)) return
+                      setExportLoadingIds(prev => [...prev, project.id])
+                      try {
+                        const res = await fetch(`/api/projects/${project.id}/export`)
+                        if (!res.ok) return toast.error('Không có ảnh nào được chọn!')
+                        const blob = await res.blob()
+                        const url = window.URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `Selected_Photos_${project.clientName}.txt`
+                        a.click()
+                        toast.success('Đã tải xuống danh sách!')
+                      } catch (e) {
+                        toast.error('Lỗi khi tải xuống')
+                      } finally {
+                        setExportLoadingIds(prev => prev.filter(id => id !== project.id))
+                      }
                     }}
                   >
-                    <Download className="mr-1 h-4 w-4" /> Tải
+                    {exportLoadingIds.includes(project.id) ? (
+                      <div className="mr-1 h-4 w-4 rounded-full border-b-2 border-white animate-spin" />
+                    ) : (
+                      <Download className="mr-1 h-4 w-4" />
+                    )} Tải
                   </Button>
                 </div>
               </div>

@@ -2,9 +2,17 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Heart, Camera, ChevronDown, Check, Columns2 } from 'lucide-react'
+import { Heart, Camera, ChevronDown, Check, Columns2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,9 +34,16 @@ export function ClientGallery({ token }: { token?: string }) {
   const router = useRouter()
   const [photos, setPhotos] = useState<Photo[]>([])
   const [loading, setLoading] = useState(!!token)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [projectData, setProjectData] = useState<any>(null)
   const [filter, setFilter] = useState<FilterType>('all')
   const [sortBy, setSortBy] = useState<SortType>('date')
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackState, setFeedbackState] = useState<{
+    variant: 'success' | 'error'
+    title: string
+    description: string
+  } | null>(null)
 
   // Lightbox state
   const [lightboxIndex, setLightboxIndex] = useState(0)
@@ -98,7 +113,27 @@ export function ClientGallery({ token }: { token?: string }) {
   }, [photos, filter, sortBy])
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-40 border-b border-border bg-card/95 p-4">
+          <div className="mx-auto max-w-7xl">
+            <div className="h-6 w-48 rounded bg-muted animate-pulse" />
+          </div>
+        </header>
+
+        <div className="mx-auto max-w-7xl px-4 py-6">
+          <div className="mb-4">
+            <div className="h-8 w-64 rounded bg-muted animate-pulse" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="aspect-[4/3] rounded-lg bg-muted animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const handleSelect = (id: string) => {
@@ -142,25 +177,43 @@ export function ClientGallery({ token }: { token?: string }) {
 
   const handleSubmit = async () => {
     if (!token) {
-      alert(`Đã gửi lựa chọn! ${selectedCount} ảnh đã được chọn. (Mock)`)
+      setFeedbackState({
+        variant: 'success',
+        title: 'Đã gửi lựa chọn',
+        description: `${selectedCount} ảnh đã được chọn. (Mock)`,
+      })
+      setFeedbackOpen(true)
       return
     }
-    
+
+    setIsSubmitting(true)
     try {
       const selections = photos
         .filter(p => p.selected)
         .map(p => ({ id: p.id, comment: p.comment }))
-      
+
       const res = await fetch(`/api/gallery/${token}/select`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selections })
       })
-      
+
       if (!res.ok) throw new Error('Failed to submit')
-      alert('Đã gửi lựa chọn thành công!')
+      setFeedbackState({
+        variant: 'success',
+        title: 'Đã gửi lựa chọn thành công',
+        description: 'Studio đã nhận được danh sách ảnh bạn chọn.',
+      })
+      setFeedbackOpen(true)
     } catch (err) {
-      alert('Có lỗi xảy ra khi gửi lựa chọn.')
+      setFeedbackState({
+        variant: 'error',
+        title: 'Không thể gửi lựa chọn',
+        description: 'Đã xảy ra lỗi khi gửi. Vui lòng thử lại sau.',
+      })
+      setFeedbackOpen(true)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -193,7 +246,7 @@ export function ClientGallery({ token }: { token?: string }) {
 
       {/* Filter Bar */}
       <div className="sticky top-16 z-30 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex flex-wrap max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
             <Button
               variant={filter === 'all' ? 'default' : 'outline'}
@@ -220,7 +273,7 @@ export function ClientGallery({ token }: { token?: string }) {
             </Button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mt-2 sm:mt-0">
             {/* Comparison button */}
             <Button
               variant="outline"
@@ -236,7 +289,8 @@ export function ClientGallery({ token }: { token?: string }) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1.5">
-                  Sắp xếp: {sortBy === 'date' ? 'Ngày' : 'Tên file'}
+                  <span className="hidden sm:inline">Sắp xếp: {sortBy === 'date' ? 'Ngày' : 'Tên file'}</span>
+                  <span className="inline sm:hidden">Sắp xếp</span>
                   <ChevronDown className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -256,7 +310,7 @@ export function ClientGallery({ token }: { token?: string }) {
       </div>
 
       {/* Photo Grid */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-6 pb-44 sm:px-6 sm:pb-6 lg:px-8">
         {filteredPhotos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Heart className="mb-4 h-12 w-12 text-muted-foreground/50" />
@@ -283,7 +337,7 @@ export function ClientGallery({ token }: { token?: string }) {
       </main>
 
       {/* Mobile progress indicator */}
-      <div className="fixed bottom-20 left-4 right-4 sm:hidden">
+      <div className="fixed bottom-24 left-4 right-4 sm:hidden">
         <div className="rounded-lg bg-card p-3 shadow-lg border border-border">
           <div className="mb-1 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Tiến độ chọn ảnh</span>
@@ -303,10 +357,10 @@ export function ClientGallery({ token }: { token?: string }) {
           </p>
           <Button
             onClick={handleSubmit}
-            disabled={selectedCount === 0}
+            disabled={selectedCount === 0 || isSubmitting}
             className="px-6"
           >
-            Gửi lựa chọn cho Studio
+            {isSubmitting ? 'Đang gửi...' : 'Gửi lựa chọn cho Studio'}
           </Button>
         </div>
       </footer>
@@ -338,6 +392,48 @@ export function ClientGallery({ token }: { token?: string }) {
         onSelect={handleSelect}
         onComment={handleOpenComment}
       />
+
+      <Dialog
+        open={feedbackOpen}
+        onOpenChange={(open) => {
+          setFeedbackOpen(open)
+          if (!open) setFeedbackState(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-4 text-center sm:text-left">
+            <div className={cn(
+              'mx-auto flex h-14 w-14 items-center justify-center rounded-full sm:mx-0',
+              feedbackState?.variant === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'
+            )}>
+              {feedbackState?.variant === 'success' ? (
+                <CheckCircle2 className="h-7 w-7" />
+              ) : (
+                <AlertCircle className="h-7 w-7" />
+              )}
+            </div>
+            <div className="space-y-1">
+              <DialogTitle className="text-xl">
+                {feedbackState?.title || 'Thông báo'}
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-6">
+                {feedbackState?.description || ''}
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() => {
+                setFeedbackOpen(false)
+                setFeedbackState(null)
+              }}
+            >
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

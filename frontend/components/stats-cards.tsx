@@ -12,12 +12,15 @@ interface StatsCardsProps {
 
 export function StatsCards({ stats }: StatsCardsProps) {
   const [cloudUsage, setCloudUsage] = useState<any>(null)
+  const [cloudLoading, setCloudLoading] = useState(true)
 
   useEffect(() => {
+    setCloudLoading(true)
     fetch('/api/cloudinary/usage')
       .then(res => res.ok ? res.json() : null)
       .then(data => setCloudUsage(data))
       .catch(() => {})
+      .finally(() => setCloudLoading(false))
   }, [])
 
   const cards = [
@@ -70,18 +73,28 @@ export function StatsCards({ stats }: StatsCardsProps) {
             <div className="min-w-0 flex-1">
               <p className="text-sm text-muted-foreground">Dung lượng Cloudinary</p>
               <p className="text-lg font-semibold text-foreground">
-                {cloudUsage ? cloudUsage.usedFormatted : stats.storageUsed}
+                {cloudLoading ? (
+                  <span className="inline-block h-6 w-24 rounded bg-muted animate-pulse" />
+                ) : (
+                  cloudUsage ? cloudUsage.usedFormatted : stats.storageUsed
+                )}
               </p>
             </div>
           </div>
-          {cloudUsage && (
+          {cloudLoading ? (
             <div className="space-y-1.5">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{cloudUsage.usedFormatted} / {cloudUsage.limitFormatted}</span>
-                <span className={cloudUsage.percentage > 80 ? 'text-red-500 font-medium' : ''}>{cloudUsage.percentage}%</span>
-              </div>
-              <Progress value={cloudUsage.percentage} className="h-1.5" />
+              <div className="h-3 w-full rounded bg-muted animate-pulse" />
             </div>
+          ) : (
+            cloudUsage && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{cloudUsage.usedFormatted} / {cloudUsage.limitFormatted}</span>
+                  <span className={cloudUsage.percentage > 80 ? 'text-red-500 font-medium' : ''}>{cloudUsage.percentage}%</span>
+                </div>
+                <Progress value={cloudUsage.percentage} className="h-1.5" />
+              </div>
+            )
           )}
         </CardContent>
       </Card>

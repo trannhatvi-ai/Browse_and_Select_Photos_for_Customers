@@ -21,6 +21,7 @@ interface UploadFile {
 export function NewProjectForm() {
   const router = useRouter()
   const [existingProjects, setExistingProjects] = useState<Array<{ clientName: string; clientEmail: string }>>([])
+  const [loadingExisting, setLoadingExisting] = useState(true)
   const autoEmailNameRef = useRef('')
 
   // Form state
@@ -38,10 +39,12 @@ export function NewProjectForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
+    setLoadingExisting(true)
     fetch('/api/projects')
       .then((res) => (res.ok ? res.json() : []))
       .then((projects) => setExistingProjects(projects))
       .catch(() => {})
+      .finally(() => setLoadingExisting(false))
   }, [])
 
   useEffect(() => {
@@ -170,27 +173,37 @@ export function NewProjectForm() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="clientName">Tên khách hàng</Label>
-            <Input
-              id="clientName"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder="Nguyễn Văn A"
-              required
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="clientName"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Nguyễn Văn A"
+                required
+              />
+              {loadingExisting && (
+                <div className="h-8 w-16 rounded bg-muted animate-pulse" />
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="clientEmail">Địa chỉ Email</Label>
-            <Input
-              id="clientEmail"
-              type="email"
-              value={clientEmail}
-              onChange={(e) => {
-                autoEmailNameRef.current = ''
-                setClientEmail(e.target.value)
-              }}
-              placeholder="email@example.com"
-              required
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="clientEmail"
+                type="email"
+                value={clientEmail}
+                onChange={(e) => {
+                  autoEmailNameRef.current = ''
+                  setClientEmail(e.target.value)
+                }}
+                placeholder="email@example.com"
+                required
+              />
+              {loadingExisting && (
+                <div className="h-8 w-40 rounded bg-muted animate-pulse" />
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="accessPassword">
