@@ -245,13 +245,20 @@ export function ClientGallery({ token }: { token?: string }) {
       </header>
 
       {/* Filter Bar */}
-      <div className="sticky top-16 z-30 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="mx-auto flex flex-wrap max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
+      <div className="sticky top-16 z-30 border-b border-border/70 bg-card/90 backdrop-blur-xl supports-[backdrop-filter]:bg-card/75 shadow-[0_12px_30px_-24px_rgba(0,0,0,0.45)]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:overflow-visible lg:pb-0">
             <Button
               variant={filter === 'all' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter('all')}
+              aria-pressed={filter === 'all'}
+              className={cn(
+                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200',
+                filter === 'all'
+                  ? 'bg-foreground text-background shadow-md shadow-foreground/15 hover:bg-foreground/90'
+                  : 'border-border/80 bg-background/80 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground'
+              )}
             >
               Tất cả ảnh
             </Button>
@@ -259,36 +266,57 @@ export function ClientGallery({ token }: { token?: string }) {
               variant={filter === 'selected' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter('selected')}
-              className="gap-1.5"
+              aria-pressed={filter === 'selected'}
+              className={cn(
+                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200 gap-1.5',
+                filter === 'selected'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20 hover:bg-rose-600/90'
+                  : 'border-border/80 bg-background/80 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground'
+              )}
             >
-              <Heart className={cn('h-3.5 w-3.5', filter === 'selected' && 'fill-current')} />
+              <Heart className={cn('h-3.5 w-3.5 transition-transform', filter === 'selected' && 'fill-current scale-110')} />
               Đã chọn
             </Button>
             <Button
               variant={filter === 'unselected' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter('unselected')}
+              aria-pressed={filter === 'unselected'}
+              className={cn(
+                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200',
+                filter === 'unselected'
+                  ? 'bg-foreground text-background shadow-md shadow-foreground/15 hover:bg-foreground/90'
+                  : 'border-border/80 bg-background/80 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground'
+              )}
             >
               Chưa chọn
             </Button>
           </div>
 
-          <div className="flex items-center gap-2 mt-2 sm:mt-0">
+          <div className="flex items-center gap-2 self-start lg:self-auto">
             {/* Comparison button */}
             <Button
               variant="outline"
               size="sm"
               onClick={() => setComparisonOpen(true)}
               disabled={filteredPhotos.length < 2}
-              className="gap-1.5"
+              className={cn(
+                'h-9 shrink-0 rounded-full border-border/80 bg-background/80 px-4 text-sm font-medium shadow-sm transition-all duration-200 gap-1.5 hover:bg-muted hover:text-foreground',
+                filteredPhotos.length < 2 && 'opacity-60'
+              )}
             >
               <Columns2 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">So sánh ảnh</span>
+              <span className="inline sm:hidden">So sánh</span>
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 shrink-0 min-w-[128px] justify-between rounded-full border-border/80 bg-background/80 px-4 text-sm font-medium shadow-sm transition-all duration-200 gap-2 hover:bg-muted hover:text-foreground"
+                >
                   <span className="hidden sm:inline">Sắp xếp: {sortBy === 'date' ? 'Ngày' : 'Tên file'}</span>
                   <span className="inline sm:hidden">Sắp xếp</span>
                   <ChevronDown className="h-3.5 w-3.5" />
