@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { X, Heart, MessageCircle, ChevronLeft, ChevronRight, Columns2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { X, Heart, MessageCircle, ChevronLeft, ChevronRight, Columns2, Rows2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Photo } from '@/lib/types'
@@ -14,6 +14,8 @@ interface ComparisonViewerProps {
   onComment: (id: string) => void
 }
 
+type LayoutMode = 'side-by-side' | 'stacked'
+
 export function ComparisonViewer({
   photos,
   isOpen,
@@ -24,6 +26,7 @@ export function ComparisonViewer({
   const [leftIndex, setLeftIndex] = useState(0)
   const [rightIndex, setRightIndex] = useState(1)
   const [activeSide, setActiveSide] = useState<'left' | 'right'>('left')
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('stacked')
 
   const leftPhoto = photos[leftIndex]
   const rightPhoto = photos[rightIndex]
@@ -31,8 +34,12 @@ export function ComparisonViewer({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!isOpen) return
-      if (e.key === 'Escape') onClose()
-      
+
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+
       if (activeSide === 'left') {
         if (e.key === 'ArrowLeft' && leftIndex > 0) setLeftIndex(leftIndex - 1)
         if (e.key === 'ArrowRight' && leftIndex < photos.length - 1) setLeftIndex(leftIndex + 1)
@@ -40,13 +47,13 @@ export function ComparisonViewer({
         if (e.key === 'ArrowLeft' && rightIndex > 0) setRightIndex(rightIndex - 1)
         if (e.key === 'ArrowRight' && rightIndex < photos.length - 1) setRightIndex(rightIndex + 1)
       }
-      
+
       if (e.key === 'Tab') {
         e.preventDefault()
-        setActiveSide(activeSide === 'left' ? 'right' : 'left')
+        setActiveSide((current) => (current === 'left' ? 'right' : 'left'))
       }
     },
-    [isOpen, leftIndex, rightIndex, activeSide, photos.length, onClose]
+    [activeSide, isOpen, leftIndex, onClose, photos.length, rightIndex]
   )
 
   useEffect(() => {
@@ -55,23 +62,28 @@ export function ComparisonViewer({
   }, [handleKeyDown])
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
+    document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => {
       document.body.style.overflow = ''
     }
   }, [isOpen])
 
-  // Reset indices when opening
   useEffect(() => {
-    if (isOpen) {
-      setLeftIndex(0)
-      setRightIndex(Math.min(1, photos.length - 1))
-      setActiveSide('left')
+    const updateLayoutMode = () => {
+      setLayoutMode(window.innerWidth < 640 ? 'stacked' : 'side-by-side')
     }
+
+    updateLayoutMode()
+    window.addEventListener('resize', updateLayoutMode)
+    return () => window.removeEventListener('resize', updateLayoutMode)
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen) return
+    setLeftIndex(0)
+    setRightIndex(Math.min(1, photos.length - 1))
+    setActiveSide('left')
+    setLayoutMode(window.innerWidth < 640 ? 'stacked' : 'side-by-side')
   }, [isOpen, photos.length])
 
   if (!isOpen || photos.length < 2) return null
@@ -88,22 +100,21 @@ export function ComparisonViewer({
 
   const renderPhotoPanel = (photo: Photo, side: 'left' | 'right', index: number) => {
     const isActive = activeSide === side
+
     return (
       <div
         className={cn(
-          'relative flex-1 flex flex-col bg-black/95 transition-all',
+          'relative flex h-full min-h-0 flex-col overflow-hidden bg-black/95 transition-all',
           isActive && 'ring-2 ring-inset ring-accent'
         )}
         onClick={() => setActiveSide(side)}
       >
-        {/* Active indicator */}
         {isActive && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 rounded-full bg-accent px-3 py-1 text-xs font-medium text-white">
+          <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-accent px-3 py-1 text-xs font-medium text-white">
             Đang chọn
           </div>
         )}
 
-        {/* Navigation buttons */}
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -111,12 +122,13 @@ export function ComparisonViewer({
           }}
           disabled={index === 0}
           className={cn(
-            'absolute left-2 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20',
-            index === 0 && 'opacity-30 cursor-not-allowed'
+            'absolute left-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20',
+            index === 0 && 'cursor-not-allowed opacity-30'
           )}
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
+
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -124,36 +136,33 @@ export function ComparisonViewer({
           }}
           disabled={index === photos.length - 1}
           className={cn(
-            'absolute right-2 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20',
-            index === photos.length - 1 && 'opacity-30 cursor-not-allowed'
+            'absolute right-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20',
+            index === photos.length - 1 && 'cursor-not-allowed opacity-30'
           )}
         >
           <ChevronRight className="h-5 w-5" />
         </button>
 
-        {/* Image */}
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="relative max-h-full max-w-full">
+        <div className="flex flex-1 min-h-0 items-center justify-center p-2 sm:p-4">
+          <div className="relative flex h-full max-h-full max-w-full items-center justify-center">
             <img
               src={photo.src}
               alt={photo.filename}
-              className="max-h-[70vh] max-w-full object-contain"
+              className={cn('max-w-full object-contain', layoutMode === 'stacked' ? 'max-h-full' : 'max-h-[70vh]')}
               crossOrigin="anonymous"
             />
-
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="bg-gradient-to-t from-black/80 to-transparent p-4">
-          <div className="flex items-center justify-between">
-            <div className="text-white">
-              <p className="font-medium">{photo.filename}</p>
+        <div className="shrink-0 bg-gradient-to-t from-black/80 to-transparent p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 text-white">
+              <p className="truncate font-medium">{photo.filename}</p>
               <p className="text-sm text-white/60">
                 {index + 1} / {photos.length}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -161,9 +170,7 @@ export function ComparisonViewer({
                 }}
                 className={cn(
                   'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
-                  photo.selected
-                    ? 'bg-accent text-white'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                  photo.selected ? 'bg-accent text-white' : 'bg-white/20 text-white hover:bg-white/30'
                 )}
                 aria-label={photo.selected ? 'Bỏ chọn ảnh' : 'Chọn ảnh'}
               >
@@ -176,9 +183,7 @@ export function ComparisonViewer({
                 }}
                 className={cn(
                   'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
-                  photo.comment
-                    ? 'bg-primary text-white'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                  photo.comment ? 'bg-primary text-white' : 'bg-white/20 text-white hover:bg-white/30'
                 )}
                 aria-label="Thêm ghi chú"
               >
@@ -193,26 +198,47 @@ export function ComparisonViewer({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
-      {/* Header */}
-      <div className="flex items-center justify-between bg-black/80 px-4 py-3">
-        <div className="flex items-center gap-3 text-white">
+      <div className="flex items-center justify-between gap-3 bg-black/80 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3 text-white">
           <Columns2 className="h-5 w-5" />
           <span className="font-medium">So sánh ảnh</span>
-          <span className="text-sm text-white/60">
+          <span className="hidden text-sm text-white/60 sm:inline">
             (Nhấn Tab để chuyển bên, mũi tên để chuyển ảnh)
           </span>
         </div>
-        <button
-          onClick={onClose}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-          aria-label="Đóng"
-        >
-          <X className="h-5 w-5" />
-        </button>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setLayoutMode((current) => (current === 'stacked' ? 'side-by-side' : 'stacked'))}
+            className="border-white/15 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+          >
+            {layoutMode === 'stacked' ? (
+              <>
+                <Rows2 className="mr-2 h-4 w-4" />
+                Trên dưới
+              </>
+            ) : (
+              <>
+                <Columns2 className="mr-2 h-4 w-4" />
+                2 bên
+              </>
+            )}
+          </Button>
+
+          <button
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+            aria-label="Đóng"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
-      {/* Comparison panels */}
-      <div className="flex flex-1 gap-1">
+      <div className={cn('grid flex-1 min-h-0 gap-1 overflow-hidden', layoutMode === 'stacked' ? 'grid-rows-2' : 'grid-cols-2')}>
         {renderPhotoPanel(leftPhoto, 'left', leftIndex)}
         {renderPhotoPanel(rightPhoto, 'right', rightIndex)}
       </div>
