@@ -1,0 +1,28 @@
+export interface Photo {
+  id: string
+  src: string
+  filename: string
+  date: string
+  selected: boolean
+  comment?: string
+}
+
+export interface Project {
+  id: string
+  clientName: string
+  clientEmail: string
+  eventName: string
+  eventDate: string
+  status: 'uploading' | 'choosing' | 'done'
+  deadline: string
+  photoCount: number
+  selectedCount: number
+  maxSelections: number
+}
+
+export interface StatsData {
+  totalProjects: number
+  pendingReview: number
+  completed: number
+  storageUsed: string
+}

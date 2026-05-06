@@ -1,5 +1,47 @@
 # AGENTS.md - Photo Proofing Studio
 
+## Development Methodology
+
+This project follows a rigorous quality-first workflow combining three open-source tools:
+
+### OpenSpec (Spec-Driven Development)
+All features are planned in `openspec/` before implementation. The source of truth lives in `openspec/specs/` (requirements). Changes are proposed in `openspec/changes/` with proposal, design, and task breakdowns.
+
+**Workflow**: propose → specs → design → tasks → implement → archive
+
+See `openspec/project.md` for project-level spec.
+Review active changes in `openspec/changes/`.
+
+### Superpowers (Quality Enforcement)
+Every development task follows the 7-step Superpowers protocol:
+1. **Brainstorm** — explore design alternatives, get approval
+2. **Isolate** — use git worktree to protect main branch
+3. **Plan** — write atomic tasks (2-5 min each) with exact file paths and code
+4. **Execute** — implement via subagents or batch with two-stage review
+5. **Test** — Test-Driven Development (RED → GREEN → REFACTOR)
+6. **Review** — two-stage: spec compliance, then code quality
+7. **Complete** — verify tests pass, merge, clean up
+
+**Core principles**:
+- TDD mandatory: failing test before any production code
+- YAGNI: build only what's required, no speculative abstractions
+- Evidence over claims: actual test output, not assumptions
+
+### Beads (Task Tracking)
+Issue tracker designed for AI agents. Tasks are represented as beads in a dependency graph.
+
+**Essential commands**:
+```bash
+bd ready              # List ready-to-work tasks
+bd show <id>          # View task details
+bd update <id> --claim  # Claim a task
+bd close <id>         # Mark task complete
+```
+
+All work must be tracked in Beads. No ad-hoc tasks. See `CLAUDE.md` for Beads plugin instructions.
+
+---
+
 ## Project Overview
 
 A web application for photography studios that allows clients to browse, review, and select their favorite photos from photo sessions. The system has two main user roles:
@@ -177,74 +219,22 @@ interface StatsData {
 
 ## Current State & Limitations
 
-- **Mock Data Only**: All data comes from `lib/mock-data.ts` using placeholder images from `picsum.photos`
-- **No Backend**: No API routes, database, or authentication yet
-- **No Real Upload**: File upload in `new-project-form.tsx` uses simulated progress
-- **No Auth**: No login/register, hardcoded client name in gallery
-- **Placeholder Pages**: Clients and Settings pages are stubs
-- **No State Management**: Using component-level `useState` only
-- **Localization**: UI text currently in Vietnamese (partial)
+- **Frontend**: Complete. Client gallery, dashboard, new project form, all using mock data.
+- **Mock Data**: `lib/mock-data.ts` với Picsum placeholder images.
+- **No Backend Yet**: API routes, database, auth đang **pending** — có OpenSpec plan trong `openspec/changes/backend-implementation/`.
+- **No Real Upload**: `new-project-form.tsx` dùng simulated progress.
+- **Placeholder Pages**: Clients and Settings chưa implement.
+- **State Management**: Component-level `useState` only.
+- **Localization**: UI text đang tiếng Việt (partial, có thể cần hoàn thiện).
+
+## OpenSpec Changes
+
+**Active**: `openspec/changes/backend-implementation/`
+- Backend API implementation (Auth, Projects, Photos, Storage, Email)
+- See `tasks.md` for detailed checklist
+- Tracked as Beads issue: `Browse_and_Select_Photos_for_Customers-9lr`
 
 ## Commands
-
-```bash
-# Navigate to frontend directory first
-cd frontend
-
-# Install dependencies
-pnpm install
-
-# Development server
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Start production server
-pnpm start
-
-# Lint
-pnpm lint
-```
-
-## Conventions for Development
-
-1. **File naming**: kebab-case for files (`photo-card.tsx`, `mock-data.ts`)
-2. **Components**: Use `'use client'` directive for interactive components. Server components by default.
-3. **Imports**: Use `@/` path alias (maps to `frontend/` root)
-4. **Styling**: Use Tailwind CSS classes + `cn()` utility from `lib/utils.ts` for conditional classes
-5. **UI Components**: Use shadcn/ui components from `components/ui/`. Add new ones via `npx shadcn@latest add <component>`
-6. **Types**: Define shared interfaces in `lib/types.ts`
-7. **Icons**: Import from `lucide-react`
-8. **State**: Use React hooks (`useState`, `useMemo`, `useCallback`). No external state management yet.
-9. **No comments**: Do not add code comments unless explicitly requested.
-10. **Language**: Code in English. UI text in Vietnamese (localized).
-
-## Next Steps (Backend Development)
-
-The frontend is complete with mock data. The following backend features need to be built:
-
-1. **API Routes** (Next.js Route Handlers in `app/api/`)
-   - Auth: login, register, session management
-   - Projects: CRUD operations
-   - Photos: upload, list, delete, watermark generation
-   - Selections: save client selections and comments
-   - Notifications: email to client with project link
-
-2. **Database** (recommended: PostgreSQL + Prisma or Drizzle ORM)
-   - Users (studio owners + clients)
-   - Projects
-   - Photos
-   - Selections
-
-3. **File Storage** (recommended: S3-compatible storage)
-   - Original photos
-   - Watermarked previews
-   - Studio logos
-
-4. **Authentication** (recommended: NextAuth.js or similar)
-   - Studio admin login
-   - Client access via link + optional password
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
@@ -268,13 +258,13 @@ bd close <id>         # Complete work
 
 ## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.**
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
+1. **File issues for remaining work** - Create Beads issues for anything that needs follow-up (`bd create` or update existing)
+2. **Run quality gates** - Tests, linters, builds (if code changed)
+3. **Update Beads status** - Close finished tasks, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
@@ -282,13 +272,21 @@ bd close <id>         # Complete work
    git push
    git status  # MUST show "up to date with origin"
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+5. **Clean up** - Clear stashes, prune remote branches, remove temp files
+6. **Verify** - All changes committed AND pushed, Beads DB synced
+7. **Hand off** - Provide context for next session (what was done, next ready tasks from `bd ready`)
 
 **CRITICAL RULES:**
 - Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
+- NEVER stop before pushing — that leaves work stranded locally
+- NEVER say "ready to push when you are" — YOU must push
 - If push fails, resolve and retry until it succeeds
+- ALL tasks must be tracked in Beads; no off-the-books work
+
+**Superpowers Reminder:**
+- Every feature begins with a failing test (RED)
+- Build minimal code to pass (GREEN)
+- Refactor safely (REFACTOR)
+- Apply YAGNI: build only what the spec requires
+- Provide evidence: show actual test output, not claims
 <!-- END BEADS INTEGRATION -->

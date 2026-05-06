@@ -1,0 +1,80 @@
+// This file was created by `prisma init`
+// Environment variables loaded from .env
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  password     String?   // hashed bcrypt for admin; null for client access via token
+  role         Role      @default(STUDIO)
+  projects     Project[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Project {
+  id              String      @id @default(cuid())
+  clientName      String
+  clientEmail     String
+  eventName       String
+  eventDate       DateTime
+  deadline        DateTime
+  maxSelections   Int         @default(50)
+  status          ProjectStatus @default(UPLOADING)
+  watermarkConfig Json?       // { opacity: number, logoUrl: string }
+  accessToken     String      @unique
+  accessPassword  String?
+  createdBy       String
+  createdByUser   User        @relation(fields: [createdBy], references: [id])
+  photos          Photo[]
+  selections      Selection[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Photo {
+  id          String     @id @default(cuid())
+  projectId   String
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  filename    String
+  originalUrl String     // S3/local path to original
+  previewUrl  String     // Watermarked URL
+  width       Int
+  height      Int
+  size        Int        // bytes
+  selected    Boolean    @default(false)
+  comment     String?
+  uploadedAt  DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Selection {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  photoId   String
+  photo     Photo    @relation(fields: [photoId], references: [id])
+  comment   String?
+  createdAt DateTime @default(now())
+  @@unique([projectId, photoId])
+}
+
+enum Role {
+  STUDIO
+  CLIENT
+}
+
+enum ProjectStatus {
+  UPLOADING   // Studio đang upload ảnh
+  CHOOSING    // Client đang chọn ảnh
+  DONE        // Selection submitted, hoàn thành
+}

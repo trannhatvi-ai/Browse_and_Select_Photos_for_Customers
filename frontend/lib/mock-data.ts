@@ -1,0 +1,80 @@
+import type { Photo, Project, StatsData } from './types'
+
+export const mockPhotos: Photo[] = Array.from({ length: 24 }, (_, i) => ({
+  id: `photo-${i + 1}`,
+  src: `https://picsum.photos/seed/${i + 100}/800/600`,
+  filename: `IMG_${String(1000 + i).padStart(4, '0')}.jpg`,
+  date: new Date(2024, 2, 15 + Math.floor(i / 8)).toISOString(),
+  selected: false,
+  comment: undefined,
+}))
+
+export const mockProjects: Project[] = [
+  {
+    id: 'proj-1',
+    clientName: 'Sarah Johnson',
+    clientEmail: 'sarah@example.com',
+    eventName: 'Wedding Ceremony',
+    eventDate: '2024-06-15',
+    status: 'choosing',
+    deadline: '2024-07-01',
+    photoCount: 450,
+    selectedCount: 32,
+    maxSelections: 100,
+  },
+  {
+    id: 'proj-2',
+    clientName: 'Michael Chen',
+    clientEmail: 'michael@example.com',
+    eventName: 'Corporate Headshots',
+    eventDate: '2024-05-20',
+    status: 'done',
+    deadline: '2024-05-30',
+    photoCount: 120,
+    selectedCount: 45,
+    maxSelections: 50,
+  },
+  {
+    id: 'proj-3',
+    clientName: 'Emma Williams',
+    clientEmail: 'emma@example.com',
+    eventName: 'Family Portrait',
+    eventDate: '2024-07-10',
+    status: 'uploading',
+    deadline: '2024-07-25',
+    photoCount: 85,
+    selectedCount: 0,
+    maxSelections: 30,
+  },
+  {
+    id: 'proj-4',
+    clientName: 'David Martinez',
+    clientEmail: 'david@example.com',
+    eventName: 'Engagement Photos',
+    eventDate: '2024-04-28',
+    status: 'choosing',
+    deadline: '2024-05-15',
+    photoCount: 200,
+    selectedCount: 18,
+    maxSelections: 60,
+  },
+  {
+    id: 'proj-5',
+    clientName: 'Lisa Thompson',
+    clientEmail: 'lisa@example.com',
+    eventName: 'Graduation Ceremony',
+    eventDate: '2024-05-25',
+    status: 'done',
+    deadline: '2024-06-10',
+    photoCount: 95,
+    selectedCount: 25,
+    maxSelections: 25,
+  },
+]
+
+export const mockStats: StatsData = {
+  totalProjects: 24,
+  pendingReview: 8,
+  completed: 14,
+  storageUsed: '245.8 GB',
+}
