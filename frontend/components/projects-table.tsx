@@ -165,7 +165,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
         setMaxSelectionsDraft(String(data.maxSelections ?? 50))
       }
     } catch {
-      toast.error('Không thể tải thông tin dự án')
+      toast.error('Không thể tải thông tin show chụp')
     } finally {
       setLoadingDetail(false)
     }
@@ -242,7 +242,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
     try {
       const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
       if (res.ok) {
-        toast.success('Đã xóa dự án!')
+        toast.success('Đã xóa show chụp!')
         if (selectedProject?.id === projectId) {
           setDialogOpen(false)
           setSelectedProject(null)
@@ -311,7 +311,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
           <div className="relative flex-1 min-w-[240px] max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Tìm kiếm dự án..."
+              placeholder="Tìm kiếm show chụp..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-10"
@@ -361,7 +361,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
               {desktopProjects.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    Không tìm thấy dự án nào
+                    Không tìm thấy show chụp nào
                   </TableCell>
                 </TableRow>
               ) : (
@@ -438,7 +438,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => setDeleteProjectId(project.id)} className="text-destructive">
-                              <Trash2 className="mr-2 h-4 w-4" /> Xóa dự án
+                              <Trash2 className="mr-2 h-4 w-4" /> Xóa show chụp
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -497,7 +497,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
                     className="h-11 px-3 text-sm"
                     title="Copy link gửi khách"
                     onClick={() => {
-                      if (!project.accessToken) return toast.error('Không có link dự án')
+                      if (!project.accessToken) return toast.error('Không có link show chụp')
                       const url = `${window.location.origin}/gallery/${project.accessToken}`
                       navigator.clipboard.writeText(url)
                       toast.success('Đã copy link gallery!')
@@ -558,7 +558,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
                   <span className="text-muted-foreground">•</span>
                   <span>Mã: <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{selectedProject.accessToken}</code></span>
                 </span>
-              ) : 'Đang tải thông tin dự án...'}
+              ) : 'Đang tải thông tin show chụp...'}
             </DialogDescription>
           </DialogHeader>
 
@@ -594,7 +594,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
                   <div className="space-y-1">
                     <h3 className="font-semibold text-sm">Chỉnh số ảnh tối đa</h3>
                     <p className="text-xs text-muted-foreground">
-                      Thay đổi giới hạn ảnh khách được phép chọn cho dự án này.
+                      Thay đổi giới hạn ảnh khách được phép chọn cho show chụp này.
                     </p>
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -649,7 +649,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
                 {/* Photos Grid */}
                 <div className="space-y-3">
                   <h3 className="font-semibold text-sm">
-                    Ảnh trong dự án ({selectedProject.photos?.length || 0})
+                    Ảnh trong show chụp ({selectedProject.photos?.length || 0})
                   </h3>
                   {selectedProject.photos?.length > 0 ? (
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
@@ -690,9 +690,9 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
       <AlertDialog open={Boolean(deleteProjectId)} onOpenChange={(open) => !open && setDeleteProjectId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa dự án?</AlertDialogTitle>
+            <AlertDialogTitle>Xóa show chụp?</AlertDialogTitle>
             <AlertDialogDescription>
-              Hành động này sẽ xóa toàn bộ dự án, ảnh và dữ liệu liên quan. Không thể hoàn tác.
+              Hành động này sẽ xóa toàn bộ show chụp, ảnh và dữ liệu liên quan. Không thể hoàn tác.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -716,7 +716,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
           <AlertDialogHeader>
             <AlertDialogTitle>Xóa ảnh này?</AlertDialogTitle>
             <AlertDialogDescription>
-              Ảnh <strong>{deletePhotoTarget?.filename}</strong> sẽ bị xóa khỏi dự án.
+              Ảnh <strong>{deletePhotoTarget?.filename}</strong> sẽ bị xóa khỏi show chụp.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

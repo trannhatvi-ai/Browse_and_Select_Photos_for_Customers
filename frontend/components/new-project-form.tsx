@@ -161,7 +161,7 @@ export function NewProjectForm() {
         }
       }
 
-      alert('Tạo dự án thành công! Link sẽ được gửi đến khách hàng.')
+      alert('Tạo show chụp thành công! Link sẽ được gửi đến khách hàng.')
       router.push('/dashboard')
     } catch (err) {
       alert('Có lỗi xảy ra: ' + (err as Error).message)
@@ -231,7 +231,7 @@ export function NewProjectForm() {
       {/* Project Details */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Chi tiết dự án</CardTitle>
+          <CardTitle className="text-lg">Chi tiết show chụp</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

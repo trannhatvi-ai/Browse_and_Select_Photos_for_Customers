@@ -156,7 +156,7 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
         }
       }
 
-      toast.success('Tạo dự án thành công! Link sẽ được gửi đến khách hàng.')
+      toast.success('Tạo show chụp thành công! Link sẽ được gửi đến khách hàng.')
       resetForm()
       setSheetOpen(false)
       router.refresh()
@@ -177,14 +177,14 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
       ) : (
         <Button className={className} onClick={() => setSheetOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Dự án mới
+          Show chụp mới
         </Button>
       )}
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="w-full !sm:max-w-lg p-0 flex flex-col" style={{ maxWidth: '32rem' }}>
           <SheetHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-            <SheetTitle>Tạo dự án mới</SheetTitle>
+            <SheetTitle>Tạo show chụp mới</SheetTitle>
             <SheetDescription>
               Nhập thông tin khách hàng và tải ảnh lên
             </SheetDescription>
@@ -209,7 +209,7 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
 
               {/* Project Details */}
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Chi tiết dự án</h3>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Chi tiết show chụp</h3>
                 <div className="space-y-2">
                   <Label htmlFor="ns-eventName">Tên sự kiện</Label>
                   <Input id="ns-eventName" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="Lễ cưới" required />
@@ -285,7 +285,7 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
                 {isSubmitting ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang tạo...</>
                 ) : (
-                  'Tạo dự án & gửi link'
+                  'Tạo show chụp & gửi link'
                 )}
               </Button>
             </form>

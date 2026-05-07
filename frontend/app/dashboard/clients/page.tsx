@@ -91,7 +91,7 @@ export default function ClientsPage() {
             <TableRow>
               <TableHead>Khách hàng</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead className="text-center">Số dự án</TableHead>
+              <TableHead className="text-center">Số show chụp</TableHead>
               <TableHead>Gần nhất</TableHead>
             </TableRow>
           </TableHeader>
@@ -169,7 +169,7 @@ export default function ClientsPage() {
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1.5">
                     <FolderOpen className="h-4 w-4" />
-                    <span>{client.projectCount} dự án</span>
+                    <span>{client.projectCount} show chụp</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Calendar className="h-4 w-4" />

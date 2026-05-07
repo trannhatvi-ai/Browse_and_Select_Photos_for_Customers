@@ -64,9 +64,9 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Dự án của tôi</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Show chụp của tôi</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Quản lý các dự án chọn ảnh của bạn
+            Quản lý các show chụp chọn ảnh của bạn
           </p>
         </div>
         {/* Desktop button only */}
@@ -78,7 +78,7 @@ export default async function DashboardPage() {
 
       {/* Projects Section */}
       <div>
-        <h2 className="mb-4 text-lg font-medium text-foreground">Dự án gần đây</h2>
+        <h2 className="mb-4 text-lg font-medium text-foreground">Show chụp gần đây</h2>
         <ProjectsTable projects={projects} />
       </div>
 

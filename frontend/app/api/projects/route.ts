@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error: 'Cloudinary chưa được cấu hình',
-        message: `Vui lòng cấu hình ${missing?.join(', ')} trong phần Cài đặt trước khi tạo dự án.`,
+        message: `Vui lòng cấu hình ${missing?.join(', ')} trong phần Cài đặt trước khi tạo show chụp.`,
         missing,
       },
       { status: 400 }

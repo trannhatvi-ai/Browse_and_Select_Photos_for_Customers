@@ -75,7 +75,7 @@ export async function DELETE(
 
   const { id } = await params
   
-  // Lấy thông tin dự án để kiểm tra owner
+  // Lấy thông tin show chụp để kiểm tra owner
   const project = await prisma.project.findUnique({
     where: { id },
     select: { createdBy: true },
@@ -92,7 +92,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         error: 'Cloudinary not configured',
-        message: 'Vui lòng cấu hình thông tin Cloudinary để xóa dự án.'
+        message: 'Vui lòng cấu hình thông tin Cloudinary để xóa show chụp.'
       },
       { status: 400 }
     )
@@ -101,7 +101,7 @@ export async function DELETE(
   const credentials = await getCloudinaryCredentialsForProject(id)
   cloudinary.config(credentials)
 
-  // 1. Lấy tất cả ảnh của dự án
+  // 1. Lấy tất cả ảnh của show chụp
   const photos = await prisma.photo.findMany({
     where: { projectId: id },
     select: { originalUrl: true }
@@ -116,12 +116,12 @@ export async function DELETE(
     }
   }
 
-  // 3. Xóa toàn bộ folder dự án trên Cloudinary (nếu có)
+  // 3. Xóa toàn bộ folder show chụp trên Cloudinary (nếu có)
   try {
     await cloudinary.api.delete_folder(`proofing/${id}`)
   } catch {}
 
-  // 4. Xóa dự án trong DB (cascade sẽ xóa photos + selections)
+  // 4. Xóa show chụp trong DB (cascade sẽ xóa photos + selections)
   await prisma.project.delete({ where: { id } })
 
   return NextResponse.json({ success: true })

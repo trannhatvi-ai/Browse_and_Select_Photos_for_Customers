@@ -18,7 +18,7 @@ export async function POST(
 ) {
   const { id: projectId } = await params
   
-  // Lấy thông tin dự án để kiểm tra owner
+  // Lấy thông tin show chụp để kiểm tra owner
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { createdBy: true, createdAt: true, deadline: true },
@@ -133,7 +133,7 @@ export async function DELETE(
   const { photoId } = await req.json()
   const { id: projectId } = await params
   
-  // Lấy thông tin dự án để kiểm tra owner
+  // Lấy thông tin show chụp để kiểm tra owner
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { createdBy: true },

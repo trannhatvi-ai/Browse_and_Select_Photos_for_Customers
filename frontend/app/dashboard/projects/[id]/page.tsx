@@ -104,7 +104,7 @@ export default function ProjectManagementPage({ params }: { params: Promise<{ id
         <Card className="md:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Ảnh trong dự án ({project.photos?.length || 0})</CardTitle>
+              <CardTitle>Ảnh trong show chụp ({project.photos?.length || 0})</CardTitle>
               <CardDescription>Khách đã chọn {project.photos?.filter((p:any) => p.selected).length || 0} ảnh</CardDescription>
             </div>
           </CardHeader>
@@ -122,7 +122,7 @@ export default function ProjectManagementPage({ params }: { params: Promise<{ id
               ))}
               {(!project.photos || project.photos.length === 0) && (
                 <div className="col-span-full py-12 text-center text-muted-foreground">
-                  Chưa có ảnh nào trong dự án này.
+                  Chưa có ảnh nào trong show chụp này.
                 </div>
               )}
             </div>

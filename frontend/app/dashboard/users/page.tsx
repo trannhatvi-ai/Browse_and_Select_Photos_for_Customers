@@ -199,7 +199,7 @@ export default function UsersPage() {
               <TableHead>Username</TableHead>
               <TableHead>SĐT</TableHead>
               <TableHead>Vai trò</TableHead>
-              <TableHead className="text-center">Dự án</TableHead>
+              <TableHead className="text-center">Show chụp</TableHead>
               <TableHead className="text-center">Ngày tạo</TableHead>
               <TableHead className="text-right">Thao tác</TableHead>
             </TableRow>
@@ -307,7 +307,7 @@ export default function UsersPage() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{user._count.projects} dự án</span>
+                  <span className="text-muted-foreground">{user._count.projects} show chụp</span>
                   {roleBadge(user.role)}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-2 border-t">

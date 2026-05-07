@@ -23,7 +23,7 @@ export async function GET(
   // Tạo nội dung file text: Danh sách tên file phân tách bằng dấu phẩy
   const fileList = project.photos.map(p => p.filename).join(', ')
   
-  const content = `DỰ ÁN: ${project.eventName}\nKHÁCH HÀNG: ${project.clientName}\nNGÀY CHỌN: ${new Date().toLocaleDateString('vi-VN')}\n\nDANH SÁCH FILE CHỌN (${project.photos.length} ảnh):\n${fileList}`
+  const content = `SHOW CHỤP: ${project.eventName}\nKHÁCH HÀNG: ${project.clientName}\nNGÀY CHỌN: ${new Date().toLocaleDateString('vi-VN')}\n\nDANH SÁCH FILE CHỌN (${project.photos.length} ảnh):\n${fileList}`
 
   return new NextResponse(content, {
     headers: {

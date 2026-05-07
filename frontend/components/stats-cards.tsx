@@ -26,7 +26,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
 
   const cards = [
     {
-      label: 'Tổng dự án',
+      label: 'Tổng show chụp',
       icon: FolderOpen,
       value: stats.totalProjects.toString(),
       color: 'text-blue-500',

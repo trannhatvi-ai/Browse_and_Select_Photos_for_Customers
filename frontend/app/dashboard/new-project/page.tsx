@@ -16,7 +16,7 @@ export default function NewProjectPage() {
         </Button>
         <div>
           <h1 className="text-2xl font-semibold text-foreground">
-            Tạo dự án mới
+            Tạo show chụp mới
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Thiết lập bộ sưu tập ảnh mới cho khách hàng của bạn

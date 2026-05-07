@@ -17,7 +17,7 @@ import { signOut } from 'next-auth/react'
 
 const baseNavItems = [
   { href: '/dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard, roles: ['ADMIN', 'STUDIO'] },
-  { href: '/dashboard/projects', label: 'Dự án', icon: FolderOpen, roles: ['ADMIN', 'STUDIO'] },
+  { href: '/dashboard/projects', label: 'Show chụp', icon: FolderOpen, roles: ['ADMIN', 'STUDIO'] },
   { href: '/dashboard/clients', label: 'Khách hàng', icon: UserRound, roles: ['ADMIN', 'STUDIO'] },
   { href: '/dashboard/users', label: 'Người dùng', icon: Shield, roles: ['ADMIN'] },
   { href: '/dashboard/settings', label: 'Cài đặt', icon: Settings, roles: ['ADMIN', 'STUDIO'] },

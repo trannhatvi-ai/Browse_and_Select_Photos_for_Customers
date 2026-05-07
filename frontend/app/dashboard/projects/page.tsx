@@ -18,9 +18,9 @@ export default function ProjectsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Tất cả dự án</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Tất cả show chụp</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Xem và quản lý tất cả dự án chọn ảnh của bạn
+            Xem và quản lý tất cả show chụp chọn ảnh của bạn
           </p>
         </div>
         <NewProjectSheetButton className="shrink-0" />

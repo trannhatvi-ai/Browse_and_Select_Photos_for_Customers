@@ -27,7 +27,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (searchParams.get('setup') === 'cloudinary') {
       setCloudinaryGuideOpen(true)
-      toast.warning('Bạn cần cấu hình Cloudinary trước khi tạo dự án. Hãy làm theo hướng dẫn bên dưới.')
+      toast.warning('Bạn cần cấu hình Cloudinary trước khi tạo show chụp. Hãy làm theo hướng dẫn bên dưới.')
     }
   }, [searchParams])
   const [studioName, setStudioName] = useState('')

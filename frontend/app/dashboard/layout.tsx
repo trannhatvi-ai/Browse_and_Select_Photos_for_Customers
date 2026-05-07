@@ -51,7 +51,7 @@ export default async function DashboardLayout({
         </Link>
         <Link href="/dashboard/projects" className="flex flex-col items-center p-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
           <FolderOpen className="h-5 w-5" />
-          <span className="mt-0.5 text-[10px]">Dự án</span>
+          <span className="mt-0.5 text-[10px]">Show chụp</span>
         </Link>
         <Link href="/dashboard/clients" className="flex flex-col items-center p-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
           <UserRound className="h-5 w-5" />

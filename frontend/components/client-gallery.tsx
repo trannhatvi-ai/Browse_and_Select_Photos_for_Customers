@@ -318,7 +318,7 @@ export function ClientGallery({ token }: { token?: string }) {
     try {
       setIsAILoading(true)
       const projectId = projectData?.id || token
-      if (!projectId) throw new Error('Thiếu mã dự án')
+      if (!projectId) throw new Error('Thiếu mã show chụp')
 
       const formData = new FormData()
       formData.append('file', file)
