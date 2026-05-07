@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { buildPreviewUrl } from '@/lib/storage'
+import { buildBackendUrl } from '@/lib/backend-api'
 import { getCloudinaryCredentialsForProject, validateUserCloudinarySettings } from '@/lib/cloudinary-settings'
 import { v2 as cloudinary } from 'cloudinary'
 
@@ -20,7 +21,7 @@ export async function POST(
   // Lấy thông tin dự án để kiểm tra owner
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { createdBy: true },
+    select: { createdBy: true, createdAt: true, deadline: true },
   })
   
   if (!project) {
@@ -94,6 +95,32 @@ export async function POST(
   }
 
   // Không cập nhật photoCount vì field không tồn tại trong schema
+
+  if (uploadedPhotos.length > 0) {
+    try {
+      const indexPayload = {
+        project_id: projectId,
+        urls: uploadedPhotos.map((photo: any) => photo.previewUrl),
+        rebuild: false,
+        project_created_at: project.createdAt.toISOString(),
+        project_expires_at: project.deadline.toISOString(),
+      }
+
+      const indexResponse = await fetch(buildBackendUrl('/index'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(indexPayload),
+        cache: 'no-store',
+      })
+
+      if (!indexResponse.ok) {
+        const errorText = await indexResponse.text()
+        console.error('Failed to queue indexing:', errorText)
+      }
+    } catch (error) {
+      console.error('Failed to start indexing after upload:', error)
+    }
+  }
 
   return NextResponse.json({ success: true, uploaded: uploadedPhotos.length })
 }

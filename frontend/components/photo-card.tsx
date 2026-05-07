@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Heart, MessageCircle } from 'lucide-react'
+import { Heart, MessageCircle, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Photo } from '@/lib/types'
 
@@ -10,18 +10,26 @@ interface PhotoCardProps {
   onSelect: (id: string) => void
   onComment: (id: string) => void
   onOpen: (id: string) => void
+  highlighted?: boolean
+  aiGroupSize?: number | undefined
+  onShowGroup?: (groupId: string | undefined) => void
 }
 
-export function PhotoCard({ photo, onSelect, onComment, onOpen }: PhotoCardProps) {
+export function PhotoCard({ photo, onSelect, onComment, onOpen, highlighted, aiGroupSize }: PhotoCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  highlighted = highlighted ?? false
 
   return (
     <div
       className={cn(
         'group relative aspect-[4/3] overflow-hidden rounded-lg bg-muted cursor-pointer transition-all',
-        photo.selected && 'ring-2 ring-accent ring-offset-2 ring-offset-background shadow-md'
+        photo.selected && 'ring-2 ring-accent ring-offset-2 ring-offset-background shadow-md',
+        highlighted && 'ring-4 ring-indigo-400/40'
       )}
+      data-photo-id={photo.id}
+      data-ai-group={photo.aiGroupId}
+      aria-label={photo.filename}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => onOpen(photo.id)}
@@ -58,6 +66,33 @@ export function PhotoCard({ photo, onSelect, onComment, onOpen }: PhotoCardProps
           <Heart className="h-3.5 w-3.5 fill-white text-white" />
           <span>Đã chọn</span>
         </div>
+      )}
+
+      {/* AI Best-shot badge */}
+      {photo.aiBestShot && (
+        <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg">
+          <Star className="h-3.5 w-3.5 text-white" />
+          <span>AI Recommended</span>
+        </div>
+      )}
+
+      {/* Group stack / +N indicator - top-right */}
+      {photo.aiGroupSize && photo.aiGroupSize > 1 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            if (typeof onShowGroup === 'function') onShowGroup(photo.aiGroupId)
+          }}
+          className="absolute top-3 right-3 z-20 flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg"
+          aria-label={`Nhóm ${photo.aiGroupSize} ảnh`}
+        >
+          <span className="text-[11px]">+{photo.aiGroupSize - 1}</span>
+        </button>
+      )}
+
+      {/* Highlight overlay when result of search */}
+      {highlighted && (
+        <div className="absolute inset-0 z-40 rounded-lg ring-4 ring-indigo-400/60 pointer-events-none" />
       )}
 
       {/* Comment indicator - Layer 20 */}

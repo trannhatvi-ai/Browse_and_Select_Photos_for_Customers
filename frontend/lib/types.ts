@@ -5,6 +5,10 @@ export interface Photo {
   date: string
   selected: boolean
   comment?: string
+  // Optional AI metadata
+  aiGroupId?: string
+  aiBestShot?: boolean
+  aiGroupSize?: number
 }
 
 export interface Project {
