@@ -13,10 +13,29 @@ export async function POST() {
 
   try {
     const aiBackendUrl = getBackendBaseUrl()
-    const res = await fetch(`${aiBackendUrl}/sync/all`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    })
+    const candidatePaths = ['/sync/all', '/api/sync/all']
+    let res: Response | null = null
+    let lastAttemptedUrl = ''
+
+    for (const pathname of candidatePaths) {
+      lastAttemptedUrl = new URL(pathname, aiBackendUrl).toString()
+      res = await fetch(lastAttemptedUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store'
+      })
+
+      if (res.ok || res.status !== 404) {
+        break
+      }
+    }
+
+    if (!res) {
+      return NextResponse.json(
+        { error: 'Unable to contact AI backend' },
+        { status: 502 }
+      )
+    }
 
     if (!res.ok) {
       let backendError = 'AI backend returned an error'
@@ -38,6 +57,7 @@ export async function POST() {
         {
           error: backendError,
           upstream_status: res.status,
+          attempted_url: lastAttemptedUrl,
           details: backendDetails
         },
         { status: res.status }
