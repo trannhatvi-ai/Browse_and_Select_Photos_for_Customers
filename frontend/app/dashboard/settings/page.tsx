@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { ExternalLink, Save, Loader2, FlaskConical, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,7 +20,16 @@ import {
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const searchParams = useSearchParams()
   const [cloudinaryGuideOpen, setCloudinaryGuideOpen] = useState(false)
+
+  // Auto-open Cloudinary guide when redirected from project creation
+  useEffect(() => {
+    if (searchParams.get('setup') === 'cloudinary') {
+      setCloudinaryGuideOpen(true)
+      toast.warning('Bạn cần cấu hình Cloudinary trước khi tạo dự án. Hãy làm theo hướng dẫn bên dưới.')
+    }
+  }, [searchParams])
   const [studioName, setStudioName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')

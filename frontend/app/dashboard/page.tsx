@@ -1,8 +1,8 @@
-import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatsCards } from '@/components/stats-cards'
 import { ProjectsTable } from '@/components/projects-table'
+import { NewProjectSheetButton } from '@/components/new-project-sheet-button'
 import { prisma } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -70,12 +70,7 @@ export default async function DashboardPage() {
           </p>
         </div>
         {/* Desktop button only */}
-        <Button asChild className="hidden md:flex">
-          <Link href="/dashboard/new-project">
-            <Plus className="mr-2 h-4 w-4" />
-            Dự án mới
-          </Link>
-        </Button>
+        <NewProjectSheetButton className="hidden md:flex" />
       </div>
 
       {/* Stats */}
@@ -88,11 +83,11 @@ export default async function DashboardPage() {
       </div>
 
       {/* Mobile FAB - Floating Action Button */}
-      <Button asChild size="icon" className="md:hidden fixed bottom-24 right-4 z-50 h-14 w-14 rounded-full shadow-lg">
-        <Link href="/dashboard/new-project">
-          <Plus className="h-6 w-6" />
-        </Link>
-      </Button>
+      <NewProjectSheetButton
+        variant="fab"
+        className="md:hidden fixed bottom-24 right-4 z-50 h-14 w-14 rounded-full shadow-lg"
+      />
     </div>
   )
 }
+

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { queueEmail } from '@/lib/email'
+import { validateUserCloudinarySettings } from '@/lib/cloudinary-settings'
 
 // GET /api/projects — list all projects (optionally filter by status)
 export async function GET(req: NextRequest) {
@@ -46,6 +47,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const creatorId = session.user.id
+
+  // Check Cloudinary configuration before allowing project creation
+  const { isConfigured, missing } = await validateUserCloudinarySettings(creatorId)
+  if (!isConfigured) {
+    return NextResponse.json(
+      {
+        error: 'Cloudinary chưa được cấu hình',
+        message: `Vui lòng cấu hình ${missing?.join(', ')} trong phần Cài đặt trước khi tạo dự án.`,
+        missing,
+      },
+      { status: 400 }
+    )
+  }
 
   const body = await req.json()
   const {

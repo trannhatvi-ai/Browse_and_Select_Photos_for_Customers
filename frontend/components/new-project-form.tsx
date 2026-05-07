@@ -123,7 +123,14 @@ export function NewProjectForm() {
         })
       })
 
-      if (!res.ok) throw new Error('Failed to create project')
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null)
+        if (errorData?.missing) {
+          router.push('/dashboard/settings?setup=cloudinary')
+          return
+        }
+        throw new Error(errorData?.error || 'Failed to create project')
+      }
       const project = await res.json()
 
       const filesToUpload = uploadFiles.filter(f => f.status !== 'complete')
