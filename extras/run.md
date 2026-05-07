@@ -1,4 +1,5 @@
 # Redis database
+sudo systemctl start redis-server
 sudo systemctl status redis-server
 # frontend
 cd ./frontend
