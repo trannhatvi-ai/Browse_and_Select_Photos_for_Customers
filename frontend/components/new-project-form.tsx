@@ -133,32 +133,43 @@ export function NewProjectForm() {
       }
       const project = await res.json()
 
+      // Upload files song song (batch 3)
       const filesToUpload = uploadFiles.filter(f => f.status !== 'complete')
-      for (const fileItem of filesToUpload) {
-        const formData = new FormData()
-        formData.append('file', fileItem.file)
-        
-        setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'uploading', progress: 50 } : f))
-        
-        const uploadRes = await fetch(`/api/projects/${project.id}/photos`, {
-          method: 'POST',
-          body: formData
-        })
-        
-        if (uploadRes.ok) {
-          setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'complete', progress: 100 } : f))
-        } else {
-          const errorData = await uploadRes.json()
-          
-          // Kiểm tra lỗi cấu hình Cloudinary
-          if (errorData.error === 'Cloudinary not configured') {
-            setIsSubmitting(false)
-            alert(`${errorData.message}\n\nVui lòng truy cập: /dashboard/settings để cấu hình.`)
-            return
+      const BATCH_SIZE = 3
+      
+      for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {
+        const batch = filesToUpload.slice(i, i + BATCH_SIZE)
+        await Promise.all(batch.map(async (fileItem) => {
+          const formData = new FormData()
+          formData.append('files', fileItem.file)
+
+          setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'uploading', progress: 0 } : f))
+
+          try {
+            const uploadPromise = new Promise((resolve, reject) => {
+              const xhr = new XMLHttpRequest()
+              xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                  const percent = Math.round((event.loaded / event.total) * 95)
+                  setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, progress: percent } : f))
+                }
+              }
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText))
+                else reject(new Error(xhr.responseText))
+              }
+              xhr.onerror = () => reject(new Error('Network error'))
+              xhr.open('POST', `/api/projects/${project.id}/photos`)
+              xhr.send(formData)
+            })
+
+            await uploadPromise
+            setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'complete', progress: 100 } : f))
+          } catch (err) {
+            console.error(`Failed to upload ${fileItem.name}:`, err)
+            setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'error' } : f))
           }
-          
-          setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'error' } : f))
-        }
+        }))
       }
 
       alert('Tạo show chụp thành công! Link sẽ được gửi đến khách hàng.')

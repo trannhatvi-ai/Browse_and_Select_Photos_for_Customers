@@ -13,6 +13,7 @@ import {
   Loader2,
   Search,
   Sparkles,
+  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -77,9 +78,9 @@ export function ClientGallery({ token }: { token?: string }) {
 
   const [commentModalOpen, setCommentModalOpen] = useState(false)
   const [commentPhoto, setCommentPhoto] = useState<Photo | null>(null)
+  const [highlightedPhotoIds, setHighlightedPhotoIds] = useState<Set<string>>(new Set())
   const [comparisonOpen, setComparisonOpen] = useState(false)
 
-  const [highlightedPhotoIds, setHighlightedPhotoIds] = useState<Set<string>>(new Set())
   const [isAILoading, setIsAILoading] = useState(false)
 
   const maxSelections = projectData?.maxSelections || 15
@@ -139,7 +140,7 @@ export function ClientGallery({ token }: { token?: string }) {
     })
 
     return result
-  }, [photos, filter, sortBy])
+  }, [photos, filter, sortBy, semanticMatchedIds])
 
   const handleSelect = (id: string) => {
     setPhotos((prev) =>
@@ -193,6 +194,8 @@ export function ClientGallery({ token }: { token?: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selections }),
+        cache: 'no-store',
+        next: { revalidate: 0 }
       })
 
       if (!res.ok) throw new Error('Failed to submit')
@@ -224,8 +227,13 @@ export function ClientGallery({ token }: { token?: string }) {
   }
 
   const performSemanticSearch = async (query: string) => {
-    const projectId = projectData?.id || token
-    if (!projectId) return
+    const projectId = projectData?.id
+    if (!projectId) {
+      console.error('Semantic Search: Missing project UUID. projectData:', projectData)
+      return
+    }
+
+    console.log(`Semantic Search: Starting for query "${query}" on project ${projectId}`)
 
     if (semanticAlertTimerRef.current) {
       window.clearTimeout(semanticAlertTimerRef.current)
@@ -246,23 +254,56 @@ export function ClientGallery({ token }: { token?: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_id: projectId, query, top_k: 50 }),
+        cache: 'no-store',
       })
-      const data = await res.json()
 
-      const urlToId: Record<string, string> = {}
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || `HTTP error! status: ${res.status}`)
+      }
+
+      const data = await res.json()
+      console.log('Semantic Search: Received results from backend:', data)
+
+      const extractPublicId = (url: string) => {
+        if (!url) return ''
+        try {
+          const parts = url.split('/')
+          const uploadIndex = parts.indexOf('upload')
+          if (uploadIndex !== -1 && parts.length > uploadIndex + 2) {
+            const idWithExtension = parts.slice(uploadIndex + 2).join('/')
+            return idWithExtension.split('.')[0]
+          }
+          return url.split('/').pop()?.split('.')[0] || url
+        } catch (e) {
+          return url
+        }
+      }
+
+      const idMap: Record<string, string> = {}
       for (const p of photos) {
-        urlToId[normalizeCloudinaryUrl(p.src)] = p.id
-        urlToId[p.src.split('?')[0]] = p.id
-        urlToId[p.filename] = p.id
+        const publicId = extractPublicId(p.src)
+        if (publicId) idMap[publicId] = p.id
+        idMap[p.filename] = p.id
       }
 
       const matches = new Set<string>()
       for (const r of data.results || []) {
-        const key = normalizeCloudinaryUrl(r.image_url || r.imageUrl || '')
-        const id = urlToId[key] || Object.keys(urlToId).find((k) => k.endsWith((r.image_url || '').split('/').pop() || ''))
-        if (id) matches.add(urlToId[id] || id)
+        const resultUrl = r.image_url || r.imageUrl || ''
+        const resultPublicId = extractPublicId(resultUrl)
+        
+        let matchedId = idMap[resultPublicId]
+        if (!matchedId) {
+          const filename = resultUrl.split('/').pop()?.split('.')[0] || ''
+          matchedId = idMap[filename]
+        }
+        
+        if (matchedId) {
+          matches.add(matchedId)
+        }
       }
 
+      console.log(`Semantic Search: Mapped ${matches.size} matches from ${data.results?.length || 0} backend results using PublicID`)
       setSemanticMatchedIds(matches)
       setHighlightedPhotoIds(matches)
       setSemanticStatus(
@@ -290,10 +331,12 @@ export function ClientGallery({ token }: { token?: string }) {
           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }, 200)
       }
-    } catch (err) {
-      console.error(err)
+    } catch (err: any) {
+      console.error('Semantic Search Error:', err)
+      // Only reset to null if we want to show all photos on FATAL error
+      // But if it's just no results, we should keep the empty Set
       setSemanticMatchedIds(null)
-      setSemanticStatus('Không thể tìm ảnh lúc này')
+      setSemanticStatus(`Lỗi tìm kiếm: ${err.message || 'Không rõ nguyên nhân'}`)
       setSemanticAlert({
         variant: 'error',
         title: 'Tìm theo mô tả thất bại',
@@ -307,6 +350,13 @@ export function ClientGallery({ token }: { token?: string }) {
     } finally {
       setSemanticLoading(false)
     }
+  }
+
+  const clearSemanticSearch = () => {
+    setSearchQuery('')
+    setSemanticMatchedIds(null)
+    setHighlightedPhotoIds(new Set())
+    setSemanticAlert(null)
   }
 
   const openFacePicker = (mode: 'file' | 'camera' = 'file') => {
@@ -409,19 +459,37 @@ export function ClientGallery({ token }: { token?: string }) {
             <div className="relative w-full sm:max-w-md sm:flex-1">
               <Input
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  if (!e.target.value.trim()) {
+                    setSemanticMatchedIds(null)
+                    setHighlightedPhotoIds(new Set())
+                  }
+                }}
                 placeholder="Tìm theo mô tả hoặc từ khóa"
                 className="w-full rounded-full pl-10 pr-10"
                 onKeyDown={async (e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
                     const query = searchQuery.trim()
-                    if (!query || semanticLoading) return
+                    if (!query) {
+                      clearSemanticSearch()
+                      return
+                    }
+                    if (semanticLoading) return
                     await performSemanticSearch(query)
                   }
                 }}
               />
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              {searchQuery && (
+                <button
+                  onClick={clearSemanticSearch}
+                  className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
               {semanticLoading && (
                 <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
               )}

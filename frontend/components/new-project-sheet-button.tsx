@@ -96,8 +96,8 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
     const newFiles: UploadFile[] = files.map((file, i) => ({
       id: `${Date.now()}-${i}`,
       name: file.name,
-      progress: 100,
-      status: 'complete',
+      progress: 0,
+      status: 'pending',
       file,
     }))
     setUploadFiles(prev => [...prev, ...newFiles])
@@ -259,21 +259,35 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
                   </label>
                 </div>
 
+                <p className="text-[10px] text-muted-foreground text-center italic mb-2">
+                  * Ảnh sẽ được tải lên sau khi bạn nhấn nút bên dưới
+                </p>
+
                 {uploadFiles.length > 0 && (
                   <div className="space-y-2 max-h-[200px] overflow-y-auto">
                     {uploadFiles.map(file => (
                       <div key={file.id} className="flex items-center gap-2 rounded-md border p-2">
                         <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs">{file.name}</p>
-                          <Progress value={file.progress} className="mt-1 h-1" />
+                          <p className="truncate text-xs font-medium">{file.name}</p>
+                          {file.status === 'uploading' && (
+                            <Progress value={file.progress} className="mt-1.5 h-1" />
+                          )}
                         </div>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
-                          {file.status === 'complete' ? '✓' : `${file.progress}%`}
-                        </span>
-                        <button type="button" onClick={() => removeFile(file.id)} className="shrink-0 text-muted-foreground hover:text-foreground">
-                          <X className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] text-muted-foreground">
+                            {file.status === 'complete' ? (
+                              <span className="text-green-500 font-bold">✓</span>
+                            ) : file.status === 'uploading' ? (
+                              `${file.progress}%`
+                            ) : (
+                              <span className="opacity-50 text-[9px] uppercase tracking-tighter">Sẵn sàng</span>
+                            )}
+                          </span>
+                          <button type="button" onClick={() => removeFile(file.id)} className="text-muted-foreground hover:text-foreground">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

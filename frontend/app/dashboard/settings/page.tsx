@@ -98,30 +98,74 @@ export default function SettingsPage() {
       
       <div className="grid gap-6">
         {userRole === 'ADMIN' && (
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center gap-2">
-                Cấu hình hệ thống (Dành cho Admin)
-              </CardTitle>
-              <CardDescription>Cài đặt chung cho toàn bộ các studio trong hệ thống.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg border bg-background p-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="shared-cloudinary">Cho phép dùng chung Cloudinary của Admin</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Nếu bật, các studio chưa có cấu hình riêng sẽ dùng chung tài khoản Cloudinary của Admin. 
-                    Nếu tắt, họ bắt buộc phải cấu hình tài khoản riêng mới có thể tạo show chụp mới.
-                  </p>
+          <>
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="text-primary flex items-center gap-2">
+                  Cấu hình hệ thống (Dành cho Admin)
+                </CardTitle>
+                <CardDescription>Cài đặt chung cho toàn bộ các studio trong hệ thống.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border bg-background p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="shared-cloudinary">Cho phép dùng chung Cloudinary của Admin</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Nếu bật, các studio chưa có cấu hình riêng sẽ dùng chung tài khoản Cloudinary của Admin. 
+                      Nếu tắt, họ bắt buộc phải cấu hình tài khoản riêng mới có thể tạo show chụp mới.
+                    </p>
+                  </div>
+                  <Switch
+                    id="shared-cloudinary"
+                    checked={allowSharedCloudinary}
+                    onCheckedChange={setAllowSharedCloudinary}
+                  />
                 </div>
-                <Switch
-                  id="shared-cloudinary"
-                  checked={allowSharedCloudinary}
-                  onCheckedChange={setAllowSharedCloudinary}
-                />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="border-amber-200 bg-amber-50/50">
+              <CardHeader>
+                <CardTitle className="text-amber-700 flex items-center gap-2">
+                  Bảo trì hệ thống AI
+                </CardTitle>
+                <CardDescription>
+                  Cập nhật lại toàn bộ vector nhúng (embedding) cho tất cả các show chụp trong hệ thống.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-amber-200 bg-background p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Đồng bộ hóa toàn bộ Vector (768 dims)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Dùng khi bạn thay đổi Model AI. Tiến trình chạy tuần tự trong background để không làm sập server.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="border-amber-200 hover:bg-amber-100 text-amber-700"
+                    onClick={async () => {
+                      if (!confirm('Bạn có chắc chắn muốn đồng bộ lại toàn bộ AI? Việc này có thể mất vài phút tùy lượng ảnh.')) return
+                      
+                      toast.promise(
+                        fetch('/api/admin/sync-ai', { method: 'POST' }).then(async res => {
+                          if (!res.ok) throw new Error('Lỗi backend')
+                          return res.json()
+                        }),
+                        {
+                          loading: 'Đang bắt đầu tiến trình đồng bộ ngầm...',
+                          success: (data) => `Đã bắt đầu đồng bộ ${data.queued_count} dự án!`,
+                          error: 'Không thể khởi động tiến trình đồng bộ.'
+                        }
+                      )
+                    }}
+                  >
+                    Bắt đầu đồng bộ
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
 
         <Card>

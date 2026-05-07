@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { Eye, MoreHorizontal, Download, Link as LinkIcon, Upload, Image as ImageIcon, Trash2, ArrowUpDown, Search, SlidersHorizontal } from 'lucide-react'
+import { Eye, MoreHorizontal, Download, Link as LinkIcon, Upload, Image as ImageIcon, Trash2, ArrowUpDown, Search, SlidersHorizontal, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,6 +56,14 @@ interface ProjectsTableProps {
   onRefresh?: () => void
 }
 
+interface UploadFile {
+  id: string
+  name: string
+  progress: number
+  status: 'pending' | 'uploading' | 'complete' | 'error'
+  file: File
+}
+
 function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString('vi-VN', {
     day: 'numeric',
@@ -81,6 +89,8 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
   const [exportLoadingIds, setExportLoadingIds] = useState<string[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([])
+  const [syncingIds, setSyncingIds] = useState<string[]>([])
 
   // Desktop-only state
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
@@ -211,43 +221,78 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
     const files = e.target.files
     if (!files || files.length === 0 || !selectedProject) return
 
-    setUploading(true)
-    setUploadProgress(10)
+    const newFiles: UploadFile[] = Array.from(files).map((file, i) => ({
+      id: `${Date.now()}-${i}`,
+      name: file.name,
+      progress: 0,
+      status: 'pending',
+      file,
+    }))
 
-    const formData = new FormData()
-    for (let i = 0; i < files.length; i++) {
-      formData.append('files', files[i])
+    setUploadFiles(prev => [...prev, ...newFiles])
+    setUploading(true)
+
+    // Upload từng file một nhưng cập nhật progress riêng biệt
+    for (const fileItem of newFiles) {
+      const formData = new FormData()
+      formData.append('files', fileItem.file)
+
+      setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'uploading' } : f))
+
+      try {
+        const xhr = new XMLHttpRequest()
+        const uploadPromise = new Promise((resolve, reject) => {
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percent = Math.round((event.loaded / event.total) * 95)
+              setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, progress: percent } : f))
+            }
+          }
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText))
+            else reject(new Error(xhr.responseText))
+          }
+          xhr.onerror = () => reject(new Error('Network error'))
+          xhr.open('POST', `/api/projects/${selectedProject.id}/photos`)
+          xhr.send(formData)
+        })
+
+        await uploadPromise
+        setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'complete', progress: 100 } : f))
+      } catch (err) {
+        console.error(`Failed to upload ${fileItem.name}:`, err)
+        setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'error' } : f))
+      }
     }
 
+    // Sau khi tất cả đã xong hoặc lỗi, cập nhật lại data dự án
     try {
-      setUploadProgress(40)
-      const res = await fetch(`/api/projects/${selectedProject.id}/photos`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (res.ok) {
-        setUploadProgress(100)
-        toast.success(`Đã tải lên ${files.length} ảnh thành công!`)
-        const detailRes = await fetch(`/api/projects/${selectedProject.id}/details`)
-        if (detailRes.ok) setSelectedProject(await detailRes.json())
-      } else {
-        toast.error('Upload thất bại!')
+      const detailRes = await fetch(`/api/projects/${selectedProject.id}/details`)
+      if (detailRes.ok) {
+        const updated = await detailRes.json()
+        setSelectedProject(updated)
       }
-    } catch {
-      toast.error('Lỗi kết nối khi upload!')
+    } catch (e) {
+      console.error('Failed to refresh project details:', e)
     } finally {
-      setUploading(false)
-      setUploadProgress(0)
+      // Giữ danh sách file 2 giây để người dùng thấy trạng thái "Xong" rồi mới ẩn
+      setTimeout(() => {
+        setUploadFiles([])
+        setUploading(false)
+      }, 2000)
     }
   }
 
+  const [isDeleting, setIsDeleting] = useState(false)
+
   const handleDeleteProject = async (projectId: string) => {
+    setIsDeleting(true)
     try {
       const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
       if (res.ok) {
         toast.success('Đã xóa show chụp!')
-        if (onRefresh) onRefresh() // Refresh the list
+        setDeleteProjectId(null) // Close the confirmation dialog
+        if (onRefresh) onRefresh() 
         if (selectedProject?.id === projectId) {
           setDialogOpen(false)
           setSelectedProject(null)
@@ -257,6 +302,8 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
       }
     } catch {
       toast.error('Lỗi kết nối!')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -640,13 +687,32 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                     <p className="text-sm font-medium">Nhấn để chọn hoặc kéo thả ảnh</p>
                     <p className="text-xs text-muted-foreground mt-1">JPG, PNG • Chọn nhiều ảnh cùng lúc</p>
                   </div>
-                  {uploading && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Đang tải lên...</span>
-                        <span>{uploadProgress}%</span>
-                      </div>
-                      <Progress value={uploadProgress} className="h-1.5" />
+                  {uploadFiles.length > 0 && (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto pt-2">
+                      {uploadFiles.map(file => (
+                        <div key={file.id} className="flex items-center gap-2 rounded-md border p-2 bg-muted/30">
+                          <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[11px] font-medium">{file.name}</p>
+                            {file.status === 'uploading' && (
+                              <Progress value={file.progress} className="mt-1 h-1" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[10px] text-muted-foreground">
+                              {file.status === 'complete' ? (
+                                <span className="text-green-500 font-bold">✓</span>
+                              ) : file.status === 'uploading' ? (
+                                `${file.progress}%`
+                              ) : file.status === 'error' ? (
+                                <span className="text-red-500">Lỗi</span>
+                              ) : (
+                                <span className="opacity-50 text-[9px] uppercase">Đang chờ</span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -734,16 +800,22 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Hủy</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              className="bg-red-600 hover:bg-red-700"
+              disabled={isDeleting}
+              onClick={(e) => {
+                e.preventDefault() // Ngăn đóng dialog tự động
                 if (deleteProjectId) {
                   handleDeleteProject(deleteProjectId)
-                  setDeleteProjectId(null)
                 }
               }}
             >
-              Xóa
+              {isDeleting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xóa...</>
+              ) : (
+                'Xóa'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -758,26 +830,40 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Hủy</AlertDialogCancel>
             <AlertDialogAction
-              onClick={async () => {
+              className="bg-red-600 hover:bg-red-700"
+              disabled={isDeleting}
+              onClick={async (e) => {
+                e.preventDefault()
                 if (!selectedProject || !deletePhotoTarget) return
-                const res = await fetch(`/api/projects/${selectedProject.id}/photos`, {
-                  method: 'DELETE',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ photoId: deletePhotoTarget.photoId })
-                })
-                if (res.ok) {
-                  toast.success('Đã xóa ảnh!')
-                  const r = await fetch(`/api/projects/${selectedProject.id}/details`)
-                  if (r.ok) setSelectedProject(await r.json())
-                } else {
-                  toast.error('Xóa thất bại!')
+                setIsDeleting(true)
+                try {
+                  const res = await fetch(`/api/projects/${selectedProject.id}/photos`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ photoId: deletePhotoTarget.photoId })
+                  })
+                  if (res.ok) {
+                    toast.success('Đã xóa ảnh!')
+                    const r = await fetch(`/api/projects/${selectedProject.id}/details`)
+                    if (r.ok) setSelectedProject(await r.json())
+                    setDeletePhotoTarget(null)
+                  } else {
+                    toast.error('Xóa thất bại!')
+                  }
+                } catch {
+                  toast.error('Lỗi kết nối!')
+                } finally {
+                  setIsDeleting(false)
                 }
-                setDeletePhotoTarget(null)
               }}
             >
-              Xóa
+              {isDeleting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xóa...</>
+              ) : (
+                'Xóa'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

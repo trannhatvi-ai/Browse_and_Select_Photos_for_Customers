@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, Image as ImageIcon, Trash2, Eye } from 'lucide-react'
+import { ArrowLeft, Upload, Image as ImageIcon, Trash2, Eye, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -28,6 +28,7 @@ export default function ProjectManagementPage({ params }: { params: Promise<{ id
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [deletePhotoTarget, setDeletePhotoTarget] = useState<any>(null)
+  const [syncing, setSyncing] = useState(false)
   const router = useRouter()
 
   const fetchDetails = async () => {
@@ -45,7 +46,7 @@ export default function ProjectManagementPage({ params }: { params: Promise<{ id
     if (!files || files.length === 0) return
 
     setUploading(true)
-    setProgress(10)
+    setProgress(0)
 
     const formData = new FormData()
     for (let i = 0; i < files.length; i++) {
@@ -53,23 +54,43 @@ export default function ProjectManagementPage({ params }: { params: Promise<{ id
     }
 
     try {
-      const res = await fetch(`/api/projects/${id}/photos`, {
-        method: 'POST',
-        body: formData,
-      })
+      const xhr = new XMLHttpRequest()
       
-      if (res.ok) {
-        setProgress(100)
-        toast.success('Đã tải ảnh lên thành công!')
-        setTimeout(() => {
-          setUploading(false)
-          setProgress(0)
-          fetchDetails()
-        }, 1000)
+      // Theo dõi tiến trình upload
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 90) // Giữ 10% cuối cho server xử lý
+          setProgress(percentComplete)
+        }
       }
+
+      const uploadPromise = new Promise((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText))
+          } else {
+            reject(new Error(xhr.responseText))
+          }
+        }
+        xhr.onerror = () => reject(new Error('Network error'))
+        xhr.open('POST', `/api/projects/${id}/photos`)
+        xhr.send(formData)
+      })
+
+      await uploadPromise
+      
+      setProgress(100)
+      toast.success('Đã tải ảnh lên thành công!')
+      setTimeout(() => {
+        setUploading(false)
+        setProgress(0)
+        fetchDetails()
+      }, 1000)
     } catch (err) {
+      console.error('Upload Error:', err)
       toast.error('Upload lỗi!')
       setUploading(false)
+      setProgress(0)
     }
   }
 
@@ -95,6 +116,23 @@ export default function ProjectManagementPage({ params }: { params: Promise<{ id
     }
   }
 
+  const handleSyncAI = async () => {
+    setSyncing(true)
+    try {
+      const res = await fetch(`/api/projects/${id}/index`, { method: 'POST' })
+      if (res.ok) {
+        toast.success('Đang đồng bộ AI... Vui lòng đợi vài giây để AI cập nhật dữ liệu.')
+      } else {
+        const data = await res.json()
+        toast.error(`Đồng bộ thất bại: ${data.error || 'Lỗi không xác định'}`)
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối tới server!')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   if (!project) return <div className="p-8">Đang tải...</div>
 
   const formattedPhotos = (project?.photos || []).map((p: any) => ({
@@ -111,6 +149,18 @@ export default function ProjectManagementPage({ params }: { params: Promise<{ id
         <div>
           <h1 className="text-2xl font-bold">{project.eventName}</h1>
           <p className="text-muted-foreground">Khách hàng: {project.clientName} | Mã: <code className="bg-muted px-1 rounded">{project.accessToken}</code></p>
+        </div>
+        <div className="ml-auto">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleSyncAI} 
+            disabled={syncing || !project.photos?.length}
+            className="gap-2"
+          >
+            <RefreshCw className={syncing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            {syncing ? 'Đang đồng bộ...' : 'Đồng bộ AI'}
+          </Button>
         </div>
       </div>
 

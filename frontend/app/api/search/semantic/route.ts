@@ -10,6 +10,7 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       cache: 'no-store',
+      next: { revalidate: 0 },
     })
 
     const text = await backendResponse.text()
