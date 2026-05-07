@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Shield, Camera, Loader2, Mail, Phone, Calendar, Hash, MoreHorizontal, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Shield, Camera, Loader2, Mail, Phone, Calendar, Hash, MoreHorizontal, Search, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -70,6 +70,8 @@ export default function UsersPage() {
   const [username, setUsername] = useState('')
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState('STUDIO')
 
   const fetchUsers = async () => {
@@ -106,6 +108,8 @@ export default function UsersPage() {
     setUsername('')
     setPhone('')
     setPassword('')
+    setConfirmPassword('')
+    setShowPassword(false)
     setRole('STUDIO')
     setDialogOpen(true)
   }
@@ -117,6 +121,8 @@ export default function UsersPage() {
     setUsername(user.username || '')
     setPhone(user.phone || '')
     setPassword('')
+    setConfirmPassword('')
+    setShowPassword(false)
     setRole(user.role)
     setDialogOpen(true)
   }
@@ -124,6 +130,10 @@ export default function UsersPage() {
   const handleSave = async () => {
     if (!name || !email || !username || !phone || (!editingUser && !password)) {
       toast.error('Vui lòng điền đầy đủ thông tin')
+      return
+    }
+    if (password && password !== confirmPassword) {
+      toast.error('Mật khẩu xác nhận không khớp')
       return
     }
     setSaving(true)
@@ -349,7 +359,33 @@ export default function UsersPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="u-password">Mật khẩu {editingUser && <span className="text-xs text-muted-foreground">(để trống nếu không đổi)</span>}</Label>
-              <Input id="u-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" />
+              <div className="relative">
+                <Input
+                  id="u-password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="u-confirm-password">Xác nhận mật khẩu</Label>
+              <Input
+                id="u-confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="••••••"
+              />
             </div>
             <div className="space-y-2">
               <Label>Vai trò</Label>

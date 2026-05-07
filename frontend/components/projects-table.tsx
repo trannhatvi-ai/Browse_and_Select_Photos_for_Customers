@@ -52,7 +52,8 @@ import type { Project } from '@/lib/types'
 import { StudioLightbox } from '@/components/studio-lightbox'
 
 interface ProjectsTableProps {
-  projects: Project[]
+  projects: any[]
+  onRefresh?: () => void
 }
 
 function formatDate(dateString: string) {
@@ -65,7 +66,7 @@ function formatDate(dateString: string) {
 
 type SortKey = keyof Project
 
-export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps) {
+export function ProjectsTable({ projects: initialProjects, onRefresh }: ProjectsTableProps) {
   // Shared UI state
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedProject, setSelectedProject] = useState<any>(null)
@@ -246,6 +247,7 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
       const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
       if (res.ok) {
         toast.success('Đã xóa show chụp!')
+        if (onRefresh) onRefresh() // Refresh the list
         if (selectedProject?.id === projectId) {
           setDialogOpen(false)
           setSelectedProject(null)

@@ -19,7 +19,10 @@ export async function GET() {
     })
   }
 
-  return NextResponse.json(settings)
+  return NextResponse.json({
+    ...settings,
+    userRole: session.user.role
+  })
 }
 
 export async function POST(req: NextRequest) {
@@ -29,7 +32,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { studioName, phone, email, cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret, watermarkText, watermarkOpacity } = body
+  const { studioName, phone, email, cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret, allowSharedCloudinary, watermarkText, watermarkOpacity } = body
 
   const settings = await prisma.settings.upsert({
     where: { userId: session.user.id },
@@ -40,6 +43,7 @@ export async function POST(req: NextRequest) {
       cloudinaryCloudName,
       cloudinaryApiKey,
       cloudinaryApiSecret,
+      allowSharedCloudinary,
       watermarkText,
       watermarkOpacity: parseInt(watermarkOpacity) || 30
     },
@@ -51,6 +55,7 @@ export async function POST(req: NextRequest) {
       cloudinaryCloudName,
       cloudinaryApiKey,
       cloudinaryApiSecret,
+      allowSharedCloudinary,
       watermarkText,
       watermarkOpacity: parseInt(watermarkOpacity) || 30
     }

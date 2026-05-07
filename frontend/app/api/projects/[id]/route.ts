@@ -85,19 +85,6 @@ export async function DELETE(
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
   
-  // Kiểm tra xem user đã cấu hình Cloudinary hay chưa
-  const { isConfigured } = await validateUserCloudinarySettings(project.createdBy)
-  
-  if (!isConfigured) {
-    return NextResponse.json(
-      {
-        error: 'Cloudinary not configured',
-        message: 'Vui lòng cấu hình thông tin Cloudinary để xóa show chụp.'
-      },
-      { status: 400 }
-    )
-  }
-  
   const credentials = await getCloudinaryCredentialsForProject(id)
   cloudinary.config(credentials)
 

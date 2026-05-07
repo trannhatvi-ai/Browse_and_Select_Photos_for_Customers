@@ -7,11 +7,15 @@ import { NewProjectSheetButton } from '@/components/new-project-sheet-button'
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
 
-  useEffect(() => {
+  const fetchProjects = () => {
     fetch('/api/projects')
       .then(res => res.ok ? res.json() : [])
       .then(data => setProjects(Array.isArray(data) ? data : []))
       .catch(() => setProjects([]))
+  }
+
+  useEffect(() => {
+    fetchProjects()
   }, [])
 
   return (
@@ -26,7 +30,7 @@ export default function ProjectsPage() {
         <NewProjectSheetButton className="shrink-0" />
       </div>
 
-      <ProjectsTable projects={projects} />
+      <ProjectsTable projects={projects} onRefresh={fetchProjects} />
     </div>
   )
 }

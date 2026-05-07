@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,8 @@ export default function SettingsPage() {
   const [cloudinaryCloudName, setCloudinaryCloudName] = useState('')
   const [cloudinaryApiKey, setCloudinaryApiKey] = useState('')
   const [cloudinaryApiSecret, setCloudinaryApiSecret] = useState('')
+  const [allowSharedCloudinary, setAllowSharedCloudinary] = useState(true)
+  const [userRole, setUserRole] = useState('')
 
   useEffect(() => {
     fetch('/api/settings')
@@ -47,6 +50,8 @@ export default function SettingsPage() {
         setCloudinaryCloudName(data.cloudinaryCloudName || '')
         setCloudinaryApiKey(data.cloudinaryApiKey || '')
         setCloudinaryApiSecret(data.cloudinaryApiSecret || '')
+        setAllowSharedCloudinary(data.allowSharedCloudinary ?? true)
+        setUserRole(data.userRole || '')
         setLoading(false)
       })
   }, [])
@@ -62,7 +67,8 @@ export default function SettingsPage() {
         email,
         cloudinaryCloudName,
         cloudinaryApiKey,
-        cloudinaryApiSecret
+        cloudinaryApiSecret,
+        allowSharedCloudinary
       })
     })
     
@@ -91,6 +97,33 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold">Cài đặt hệ thống</h1>
       
       <div className="grid gap-6">
+        {userRole === 'ADMIN' && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="text-primary flex items-center gap-2">
+                Cấu hình hệ thống (Dành cho Admin)
+              </CardTitle>
+              <CardDescription>Cài đặt chung cho toàn bộ các studio trong hệ thống.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border bg-background p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="shared-cloudinary">Cho phép dùng chung Cloudinary của Admin</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Nếu bật, các studio chưa có cấu hình riêng sẽ dùng chung tài khoản Cloudinary của Admin. 
+                    Nếu tắt, họ bắt buộc phải cấu hình tài khoản riêng mới có thể tạo show chụp mới.
+                  </p>
+                </div>
+                <Switch
+                  id="shared-cloudinary"
+                  checked={allowSharedCloudinary}
+                  onCheckedChange={setAllowSharedCloudinary}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Thông tin Studio</CardTitle>

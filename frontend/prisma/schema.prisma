@@ -95,6 +95,7 @@ model Settings {
   cloudinaryCloudName String?
   cloudinaryApiKey    String?
   cloudinaryApiSecret String?
+  allowSharedCloudinary Boolean @default(true)
   watermarkText   String   @default("PROOFS")
   watermarkOpacity Int     @default(30)
   updatedAt       DateTime @updatedAt

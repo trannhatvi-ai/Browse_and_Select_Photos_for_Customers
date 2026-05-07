@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Lock, Mail } from 'lucide-react'
+import { ArrowRight, Lock, Mail, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +27,8 @@ export default function LoginClient() {
   const [forgotLoading, setForgotLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState('')
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -61,6 +63,12 @@ export default function LoginClient() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (registerPassword !== registerConfirmPassword) {
+      setError('Mật khẩu xác nhận không khớp')
+      setRegisterLoading(false)
+      return
+    }
+
     setRegisterLoading(true)
     setError('')
 
@@ -170,12 +178,19 @@ export default function LoginClient() {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="login-password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      className="pl-10"
+                      className="px-10"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
                 </div>
 
@@ -207,7 +222,33 @@ export default function LoginClient() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="register-password">Mật khẩu</Label>
-                  <Input id="register-password" type="password" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} required />
+                  <div className="relative">
+                    <Input
+                      id="register-password"
+                      type={showPassword ? "text" : "password"}
+                      value={registerPassword}
+                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      className="pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-confirm-password">Xác nhận mật khẩu</Label>
+                  <Input
+                    id="register-confirm-password"
+                    type="password"
+                    value={registerConfirmPassword}
+                    onChange={(e) => setRegisterConfirmPassword(e.target.value)}
+                    required
+                  />
                 </div>
                 <Button type="submit" className="w-full" disabled={registerLoading}>{registerLoading ? 'Đang tạo...' : 'Tạo tài khoản'}</Button>
               </form>
