@@ -96,8 +96,8 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
     const newFiles: UploadFile[] = files.map((file, i) => ({
       id: `${Date.now()}-${i}`,
       name: file.name,
-      progress: 0,
-      status: 'pending',
+      progress: 100,
+      status: 'complete',
       file,
     }))
     setUploadFiles(prev => [...prev, ...newFiles])

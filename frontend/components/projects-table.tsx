@@ -49,6 +49,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Project } from '@/lib/types'
+import { StudioLightbox } from '@/components/studio-lightbox'
 
 interface ProjectsTableProps {
   projects: Project[]
@@ -77,6 +78,8 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null)
   const [deletePhotoTarget, setDeletePhotoTarget] = useState<{ photoId: string; filename: string } | null>(null)
   const [exportLoadingIds, setExportLoadingIds] = useState<string[]>([])
+  const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   // Desktop-only state
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
@@ -653,21 +656,39 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
                   </h3>
                   {selectedProject.photos?.length > 0 ? (
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
-                      {selectedProject.photos.map((photo: any) => (
-                        <div key={photo.id} className="group relative aspect-square bg-muted rounded-lg overflow-hidden">
+                      {selectedProject.photos.map((photo: any, index: number) => (
+                        <div 
+                          key={photo.id} 
+                          className="group relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer"
+                          onClick={() => {
+                            setLightboxIndex(index)
+                            setLightboxOpen(true)
+                          }}
+                        >
                           <img src={photo.previewUrl} alt={photo.filename} className="object-cover w-full h-full transition-transform group-hover:scale-105" />
                           {photo.selected && (
-                            <div className="absolute top-1.5 right-1.5 bg-green-500 text-white p-1 rounded-full shadow-md">
+                            <div className="absolute top-1.5 right-1.5 bg-green-500 text-white p-1 rounded-full shadow-md z-10">
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
                             </div>
                           )}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
-                            <button
-                              onClick={() => setDeletePhotoTarget({ photoId: photo.id, filename: photo.filename })}
-                              className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 transition-colors"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                          <div 
+                            className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2"
+                          >
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDeletePhotoTarget({ photoId: photo.id, filename: photo.filename })
+                                }}
+                                className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 transition-colors"
+                                title="Xóa ảnh"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                              <div className="bg-white/20 hover:bg-white/40 text-white rounded-full p-1.5 transition-colors">
+                                <Eye className="h-4 w-4" />
+                              </div>
+                            </div>
                             <p className="text-[10px] text-white truncate max-w-full px-1">{photo.filename}</p>
                           </div>
                         </div>
@@ -683,6 +704,21 @@ export function ProjectsTable({ projects: initialProjects }: ProjectsTableProps)
               </div>
             ) : null}
           </ScrollArea>
+          
+          <StudioLightbox
+            photos={(selectedProject?.photos || []).map((p: any) => ({
+              ...p,
+              src: p.previewUrl || (p.originalUrl?.startsWith('http') ? p.originalUrl : null) || p.url
+            }))}
+            currentIndex={lightboxIndex}
+            isOpen={lightboxOpen}
+            onClose={() => setLightboxOpen(false)}
+            onNavigate={setLightboxIndex}
+            onDelete={(photo) => {
+              setDeletePhotoTarget({ photoId: photo.id, filename: photo.filename })
+              setLightboxOpen(false)
+            }}
+          />
         </DialogContent>
       </Dialog>
 
