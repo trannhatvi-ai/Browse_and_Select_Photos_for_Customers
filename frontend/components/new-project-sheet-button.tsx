@@ -160,6 +160,7 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
       resetForm()
       setSheetOpen(false)
       router.refresh()
+      setTimeout(() => window.location.reload(), 100)
     } catch (err) {
       toast.error('Có lỗi xảy ra: ' + (err as Error).message)
     } finally {
