@@ -232,6 +232,8 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
     setUploadFiles(prev => [...prev, ...newFiles])
     setUploading(true)
 
+    const allUploadedPhotos: any[] = []
+
     // Upload từng file một nhưng cập nhật progress riêng biệt
     for (const fileItem of newFiles) {
       const formData = new FormData()
@@ -257,7 +259,10 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
           xhr.send(formData)
         })
 
-        await uploadPromise
+        const result: any = await uploadPromise
+        if (result.photos) {
+          allUploadedPhotos.push(...result.photos)
+        }
         setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'complete', progress: 100 } : f))
       } catch (err) {
         console.error(`Failed to upload ${fileItem.name}:`, err)
@@ -265,7 +270,21 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
       }
     }
 
-    // Sau khi tất cả đã xong hoặc lỗi, cập nhật lại data dự án
+    // Sau khi tất cả đã upload xong, gọi AI Indexing 1 lần duy nhất (Không await để không chặn UI)
+    if (allUploadedPhotos.length > 0) {
+      fetch(`${process.env.NEXT_PUBLIC_AI_BACKEND_URL || 'http://localhost:8000'}/index`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: selectedProject.id,
+          urls: allUploadedPhotos.map(p => p.previewUrl),
+          rebuild: false,
+          project_created_at: selectedProject.createdAt
+        })
+      }).catch(err => console.error('Failed to trigger AI indexing batch:', err))
+    }
+
+    // Cập nhật lại data dự án
     try {
       const detailRes = await fetch(`/api/projects/${selectedProject.id}/details`)
       if (detailRes.ok) {

@@ -138,6 +138,8 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
 
       // Upload files
       const filesToUpload = uploadFiles.filter(f => f.status !== 'complete')
+      const allUploadedPhotos: any[] = []
+
       for (const fileItem of filesToUpload) {
         const formData = new FormData()
         formData.append('files', fileItem.file)
@@ -150,10 +152,28 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
         })
 
         if (uploadRes.ok) {
+          const result = await uploadRes.json()
+          if (result.photos) {
+            allUploadedPhotos.push(...result.photos)
+          }
           setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'complete', progress: 100 } : f))
         } else {
           setUploadFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'error' } : f))
         }
+      }
+
+      // Sau khi tất cả đã upload xong, gọi AI Indexing 1 lần duy nhất (Không await để không chặn UI)
+      if (allUploadedPhotos.length > 0) {
+        fetch(`${process.env.NEXT_PUBLIC_AI_BACKEND_URL || 'http://localhost:8000'}/index`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_id: project.id,
+            urls: allUploadedPhotos.map(p => p.previewUrl),
+            rebuild: false,
+            project_created_at: project.createdAt
+          })
+        }).catch(err => console.error('Failed to trigger AI indexing batch:', err))
       }
 
       toast.success('Tạo show chụp thành công! Link sẽ được gửi đến khách hàng.')

@@ -96,33 +96,12 @@ export async function POST(
 
   // Không cập nhật photoCount vì field không tồn tại trong schema
 
-  if (uploadedPhotos.length > 0) {
-    try {
-      const indexPayload = {
-        project_id: projectId,
-        urls: uploadedPhotos.map((photo: any) => photo.previewUrl),
-        rebuild: false,
-        project_created_at: project.createdAt.toISOString(),
-        project_expires_at: project.deadline.toISOString(),
-      }
-
-      const indexResponse = await fetch(buildBackendUrl('/index'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(indexPayload),
-        cache: 'no-store',
-      })
-
-      if (!indexResponse.ok) {
-        const errorText = await indexResponse.text()
-        console.error('Failed to queue indexing:', errorText)
-      }
-    } catch (error) {
-      console.error('Failed to start indexing after upload:', error)
-    }
-  }
-
-  return NextResponse.json({ success: true, uploaded: uploadedPhotos.length })
+  // Indexing will be triggered from the frontend in a batch to improve performance
+  return NextResponse.json({ 
+    success: true, 
+    uploaded: uploadedPhotos.length,
+    photos: uploadedPhotos // Return photos so frontend can index them
+  })
 }
 
 // DELETE /api/projects/[id]/photos — xóa ảnh từ Cloudinary + DB
