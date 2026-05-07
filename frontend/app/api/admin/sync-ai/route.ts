@@ -1,73 +1,79 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getBackendBaseUrl } from '@/lib/backend-api'
+import { buildBackendUrl } from '@/lib/backend-api'
+import { prisma } from '@/lib/db'
 
 export async function POST() {
   const session = await getServerSession(authOptions)
   
-  // Chỉ cho phép Admin truy cập
   if (!session || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized. Admin only.' }, { status: 401 })
   }
 
   try {
-    const aiBackendUrl = getBackendBaseUrl()
-    const candidatePaths = ['/sync/all', '/api/sync/all']
-    let res: Response | null = null
-    let lastAttemptedUrl = ''
-
-    for (const pathname of candidatePaths) {
-      lastAttemptedUrl = new URL(pathname, aiBackendUrl).toString()
-      res = await fetch(lastAttemptedUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store'
-      })
-
-      if (res.ok || res.status !== 404) {
-        break
-      }
-    }
-
-    if (!res) {
-      return NextResponse.json(
-        { error: 'Unable to contact AI backend' },
-        { status: 502 }
-      )
-    }
-
-    if (!res.ok) {
-      let backendError = 'AI backend returned an error'
-      let backendDetails: unknown = null
-      try {
-        const errorPayload = await res.json()
-        backendError = errorPayload?.error || errorPayload?.detail || backendError
-        backendDetails = errorPayload
-      } catch {
-        try {
-          const errorText = await res.text()
-          if (errorText) backendError = errorText
-        } catch {
-          // Keep default message when backend response body cannot be parsed.
+    // 1. Lấy tất cả project cùng với danh sách previewUrl của ảnh từ Supabase
+    const projects = await prisma.project.findMany({
+      select: {
+        id: true,
+        createdAt: true,
+        deadline: true,
+        photos: {
+          select: {
+            previewUrl: true
+          }
         }
       }
+    })
 
-      return NextResponse.json(
-        {
-          error: backendError,
-          upstream_status: res.status,
-          attempted_url: lastAttemptedUrl,
-          details: backendDetails
-        },
-        { status: res.status }
-      )
+    if (projects.length === 0) {
+      return NextResponse.json({ message: 'No projects found in database', queued_count: 0 })
     }
 
-    const data = await res.json()
-    return NextResponse.json(data)
+    let totalQueued = 0
+    const errors: string[] = []
+
+    // 2. Duyệt qua từng project và gửi yêu cầu index cho AI Backend
+    // Lưu ý: AI Backend xử lý async (202 Accepted) nên loop này sẽ chạy nhanh
+    for (const project of projects) {
+      if (project.photos.length === 0) continue
+
+      try {
+        const indexPayload = {
+          project_id: project.id,
+          urls: project.photos.map(p => p.previewUrl),
+          rebuild: true,
+          project_created_at: project.createdAt.toISOString(),
+          project_expires_at: project.deadline.toISOString()
+        }
+
+        const res = await fetch(buildBackendUrl('/index'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(indexPayload),
+          cache: 'no-store'
+        })
+
+        if (res.ok) {
+          totalQueued++
+        } else {
+          errors.push(`Project ${project.id}: Backend returned ${res.status}`)
+        }
+      } catch (err) {
+        errors.push(`Project ${project.id}: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+    }
+
+    return NextResponse.json({
+      status: 'processing',
+      queued_count: totalQueued,
+      failed_count: projects.length - totalQueued,
+      message: `Started re-indexing for ${totalQueued} projects from Supabase.`,
+      errors: errors.length > 0 ? errors : undefined
+    })
+
   } catch (error) {
-    console.error('Sync AI Error:', error)
+    console.error('Deep Sync AI Error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal Server Error' },
       { status: 500 }
