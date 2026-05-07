@@ -18,6 +18,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+class SyncAIError extends Error {
+  status?: number
+  constructor(message: string, status?: number) {
+    super(message)
+    this.name = 'SyncAIError'
+    this.status = status
+  }
+}
+
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -149,13 +158,31 @@ export default function SettingsPage() {
                       
                       toast.promise(
                         fetch('/api/admin/sync-ai', { method: 'POST' }).then(async res => {
-                          if (!res.ok) throw new Error('Lỗi backend')
+                          if (!res.ok) {
+                            let message = 'Không thể khởi động tiến trình đồng bộ.'
+                            try {
+                              const payload = await res.json()
+                              message = payload?.error || payload?.detail || message
+                            } catch {
+                              // Keep fallback message when response is not JSON.
+                            }
+                            throw new SyncAIError(message, res.status)
+                          }
                           return res.json()
                         }),
                         {
                           loading: 'Đang bắt đầu tiến trình đồng bộ ngầm...',
                           success: (data) => `Đã bắt đầu đồng bộ ${data.queued_count} dự án!`,
-                          error: 'Không thể khởi động tiến trình đồng bộ.'
+                          error: (error) => {
+                            if (error instanceof SyncAIError) {
+                              if (error.status) {
+                                return `Lỗi ${error.status}: ${error.message}`
+                              }
+                              return error.message
+                            }
+                            if (error instanceof Error) return error.message
+                            return 'Không thể khởi động tiến trình đồng bộ.'
+                          }
                         }
                       )
                     }}
