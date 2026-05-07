@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getBackendBaseUrl } from '@/lib/backend-api'
 
 export async function POST() {
   const session = await getServerSession(authOptions)
@@ -11,7 +12,7 @@ export async function POST() {
   }
 
   try {
-    const aiBackendUrl = process.env.AI_BACKEND_URL || 'http://localhost:8000'
+    const aiBackendUrl = getBackendBaseUrl()
     const res = await fetch(`${aiBackendUrl}/sync/all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }

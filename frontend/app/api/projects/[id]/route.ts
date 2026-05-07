@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { v2 as cloudinary } from 'cloudinary'
+import { buildBackendUrl } from '@/lib/backend-api'
 import { getCloudinaryCredentialsForProject, validateUserCloudinarySettings } from '@/lib/cloudinary-settings'
 
 cloudinary.config({
@@ -25,7 +26,7 @@ export async function PATCH(
   const allowedStatuses = new Set(['CHOOSING', 'DONE'])
 
   const updateData: {
-    status?: string
+    status?: 'CHOOSING' | 'DONE'
     maxSelections?: number
   } = {}
 
@@ -110,6 +111,20 @@ export async function DELETE(
 
   // 4. Xóa show chụp trong DB (cascade sẽ xóa photos + selections)
   await prisma.project.delete({ where: { id } })
+
+  // 5. Best-effort cleanup AI vectors in backend Redis
+  try {
+    const cleanupResponse = await fetch(buildBackendUrl(`/projects/${id}/vectors`), {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    })
+    if (!cleanupResponse.ok) {
+      console.error(`AI vector cleanup returned ${cleanupResponse.status} for project ${id}`)
+    }
+  } catch (err) {
+    console.error('AI vector cleanup error:', err)
+  }
 
   return NextResponse.json({ success: true })
 }
