@@ -150,8 +150,8 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
     </button>
   )
 
-  const handleViewProject = (projectId: string) => {
-    router.push(`/dashboard/projects/${projectId}`)
+  const handleViewProject = (accessToken: string) => {
+    router.push(`/dashboard/projects/${accessToken}`)
   }
 
   // Filter by search (shared)
@@ -337,7 +337,7 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                             <Download className="h-4 w-4" />
                           )}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleViewProject(project.id)}>
+                        <Button variant="ghost" size="sm" onClick={() => handleViewProject(project.accessToken)}>
                           <Eye className="mr-1.5 h-4 w-4" /> Xem
                         </Button>
                         <DropdownMenu>
@@ -397,7 +397,7 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                     variant="outline"
                     size="sm"
                     className="h-10 px-3 text-xs flex-1 min-w-[80px]"
-                    onClick={() => handleViewProject(project.id)}
+                    onClick={() => handleViewProject(project.accessToken)}
                   >
                     <Eye className="mr-1 h-3.5 w-3.5" /> Xem
                   </Button>

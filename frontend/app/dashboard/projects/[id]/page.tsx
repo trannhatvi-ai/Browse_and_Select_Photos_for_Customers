@@ -96,12 +96,14 @@ export default function ProjectDetailPage() {
   } | null>(null)
   const [loadingStats, setLoadingStats] = useState(false)
   const [syncingAi, setSyncingAi] = useState(false)
+  const [realProjectId, setRealProjectId] = useState<string | null>(null)
 
-  const fetchAiStats = async () => {
-    if (!projectId) return
+  const fetchAiStats = async (idOverride?: string) => {
+    const idToUse = idOverride || realProjectId || projectId
+    if (!idToUse) return
     setLoadingStats(true)
     try {
-      const res = await fetch(`/api/ai-stats/projects/${projectId}/stats`)
+      const res = await fetch(`/api/ai-stats/projects/${idToUse}/stats`)
       if (res.ok) {
         const data = await res.json()
         setAiStats(data)
@@ -125,14 +127,15 @@ export default function ProjectDetailPage() {
 
       const data = await res.json()
       setProject(data)
+      setRealProjectId(data.id)
       setMaxSelectionsDraft(String(data.maxSelections ?? 0))
       setEventNameDraft(data.eventName ?? '')
       setClientNameDraft(data.clientName ?? '')
       setClientEmailDraft(data.clientEmail ?? '')
       setStatusDraft(data.status ?? 'CHOOSING')
-      
-      // Lấy luôn stats khi load details
-      void fetchAiStats()
+
+      // Lấy luôn stats khi load details, truyền ID thật vào luôn
+      void fetchAiStats(data.id)
     } catch (error) {
       toast.error((error as Error).message)
     } finally {
@@ -264,18 +267,18 @@ export default function ProjectDetailPage() {
     }))
 
     setIsUploading(true)
-    
+
     // Batch files (5 per request)
     const BATCH_SIZE = 5
     for (let i = 0; i < newFiles.length; i += BATCH_SIZE) {
       const batch = newFiles.slice(i, i + BATCH_SIZE)
-      
+
       // Add to tracking
       setUploadFiles(prev => [
-        ...prev, 
+        ...prev,
         ...batch.map(f => ({ id: f.id, name: f.name, progress: 0, status: 'uploading' }))
       ])
-      
+
       const formData = new FormData()
       batch.forEach(f => formData.append('files', f.file))
 
@@ -285,7 +288,7 @@ export default function ProjectDetailPage() {
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
               const percent = Math.round((event.loaded / event.total) * 100)
-              setUploadFiles(prev => prev.map(f => 
+              setUploadFiles(prev => prev.map(f =>
                 batch.find(bf => bf.id === f.id) ? { ...f, progress: percent } : f
               ))
             }
@@ -295,11 +298,11 @@ export default function ProjectDetailPage() {
           xhr.open('POST', `/api/projects/${project.id}/photos`)
           xhr.send(formData)
         })
-        setUploadFiles(prev => prev.map(f => 
+        setUploadFiles(prev => prev.map(f =>
           batch.find(bf => bf.id === f.id) ? { ...f, status: 'complete', progress: 100 } : f
         ))
       } catch (err) {
-        setUploadFiles(prev => prev.map(f => 
+        setUploadFiles(prev => prev.map(f =>
           batch.find(bf => bf.id === f.id) ? { ...f, status: 'error' } : f
         ))
       }
@@ -340,9 +343,9 @@ export default function ProjectDetailPage() {
     <div className="mx-auto max-w-7xl px-4 py-0 pb-36 sm:px-6 lg:px-8">
       {isUploading && (
         <div className="fixed top-0 left-0 right-0 z-[100] h-1 bg-muted/30">
-          <div 
-            className="h-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)] transition-all duration-300 ease-out" 
-            style={{ width: `${overallProgress}%` }} 
+          <div
+            className="h-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)] transition-all duration-300 ease-out"
+            style={{ width: `${overallProgress}%` }}
           />
         </div>
       )}
@@ -489,8 +492,8 @@ export default function ProjectDetailPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-                         <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                         Ngữ cảnh (Database)
+                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                        Ngữ cảnh (Database)
                       </span>
                       <span className="font-bold">{aiStats?.context_photos_db ?? 0}/{aiStats?.total_photos ?? 0}</span>
                     </div>
@@ -504,8 +507,8 @@ export default function ProjectDetailPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                         Tìm kiếm (Redis)
+                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        Tìm kiếm (Redis)
                       </span>
                       <span className="font-bold">{aiStats?.indexed_photos_redis ?? 0}/{aiStats?.total_photos ?? 0}</span>
                     </div>
@@ -517,8 +520,8 @@ export default function ProjectDetailPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full h-9 text-xs rounded-xl bg-background hover:bg-muted"
                       onClick={fetchAiStats}
                       disabled={loadingStats || syncingAi}
@@ -526,13 +529,14 @@ export default function ProjectDetailPage() {
                       {loadingStats ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
                       Kiểm tra lại
                     </Button>
-                    
-                    <Button 
+
+                    <Button
                       className="w-full h-9 text-xs rounded-xl bg-amber-500 hover:bg-amber-600 text-white"
                       onClick={async () => {
                         setSyncingAi(true)
                         try {
-                          const res = await fetch(`/api/ai-stats/projects/${project.id}/sync`, { method: 'POST' })
+                          const idToUse = realProjectId || project.id
+                          const res = await fetch(`/api/ai-stats/projects/${idToUse}/sync`, { method: 'POST' })
                           if (res.ok) {
                             const data = await res.json()
                             toast.success(`Đã bắt đầu tạo ngữ cảnh cho ${data.queued_count} ảnh!`)
@@ -571,7 +575,7 @@ export default function ProjectDetailPage() {
                   </div>
                   <p className="text-[10px] text-muted-foreground">Cập nhật thông tin cơ bản và trạng thái show.</p>
                 </div>
-                
+
                 <div className="grid gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="event-name-side" className="text-[11px] font-medium text-muted-foreground">Tên sự kiện</Label>
@@ -585,7 +589,7 @@ export default function ProjectDetailPage() {
                     <Label htmlFor="client-email-side" className="text-[11px] font-medium text-muted-foreground">Email liên hệ</Label>
                     <Input id="client-email-side" type="email" value={clientEmailDraft} onChange={e => setClientEmailDraft(e.target.value)} className="bg-background" />
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-[11px] font-medium text-muted-foreground">Trạng thái</Label>
@@ -635,7 +639,7 @@ export default function ProjectDetailPage() {
                     onChange={(e) => handleUploadFiles(e.target.files)}
                   />
                 </Button>
-                
+
                 {uploadFiles.length > 0 && (
                   <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
                     {uploadFiles.map(file => (
@@ -684,7 +688,7 @@ export default function ProjectDetailPage() {
                   </h3>
                   <p className="text-[11px] text-muted-foreground">Kiểm tra dữ liệu ngữ cảnh trong hệ thống.</p>
                 </div>
-                
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2 rounded-xl border bg-blue-50/30 p-3">
                     <div className="flex justify-between text-[11px] font-medium">
@@ -693,7 +697,7 @@ export default function ProjectDetailPage() {
                     </div>
                     <Progress value={aiStats?.percentage_db ?? 0} className="h-1 bg-blue-200" />
                   </div>
-                  
+
                   <div className="space-y-2 rounded-xl border bg-emerald-50/30 p-3">
                     <div className="flex justify-between text-[11px] font-medium">
                       <span>Redis</span>
@@ -703,8 +707,8 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="w-full h-9 text-xs rounded-xl"
                   onClick={fetchAiStats}
@@ -716,88 +720,88 @@ export default function ProjectDetailPage() {
               </div>
 
               <div className="rounded-2xl border bg-muted/30 p-4 space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="event-name" className="text-xs text-muted-foreground">Tên sự kiện</Label>
-                  <Input id="event-name" value={eventNameDraft} onChange={e => setEventNameDraft(e.target.value)} className="bg-background" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="client-name" className="text-xs text-muted-foreground">Tên khách hàng</Label>
-                  <Input id="client-name" value={clientNameDraft} onChange={e => setClientNameDraft(e.target.value)} className="bg-background" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="client-email" className="text-xs text-muted-foreground">Email</Label>
-                  <Input id="client-email" type="email" value={clientEmailDraft} onChange={e => setClientEmailDraft(e.target.value)} className="bg-background" />
-                </div>
-                
-                <div className="grid gap-4 pt-2 border-t border-dashed sm:grid-cols-2">
+                <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Trạng thái show</Label>
-                    <Select value={statusDraft} onValueChange={(v: any) => setStatusDraft(v)}>
-                      <SelectTrigger className="bg-background">
-                        <SelectValue placeholder="Chọn trạng thái" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CHOOSING">Đang chọn</SelectItem>
-                        <SelectItem value="DONE">Hoàn thành</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="event-name" className="text-xs text-muted-foreground">Tên sự kiện</Label>
+                    <Input id="event-name" value={eventNameDraft} onChange={e => setEventNameDraft(e.target.value)} className="bg-background" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="max-selections-mobile" className="text-xs text-muted-foreground">Số ảnh tối đa</Label>
-                    <Input
-                      id="max-selections-mobile"
-                      type="number"
-                      min={1}
-                      value={maxSelectionsDraft}
-                      onChange={(event) => setMaxSelectionsDraft(event.target.value)}
-                      className="bg-background"
+                    <Label htmlFor="client-name" className="text-xs text-muted-foreground">Tên khách hàng</Label>
+                    <Input id="client-name" value={clientNameDraft} onChange={e => setClientNameDraft(e.target.value)} className="bg-background" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="client-email" className="text-xs text-muted-foreground">Email</Label>
+                    <Input id="client-email" type="email" value={clientEmailDraft} onChange={e => setClientEmailDraft(e.target.value)} className="bg-background" />
+                  </div>
+
+                  <div className="grid gap-4 pt-2 border-t border-dashed sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Trạng thái show</Label>
+                      <Select value={statusDraft} onValueChange={(v: any) => setStatusDraft(v)}>
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder="Chọn trạng thái" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CHOOSING">Đang chọn</SelectItem>
+                          <SelectItem value="DONE">Hoàn thành</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="max-selections-mobile" className="text-xs text-muted-foreground">Số ảnh tối đa</Label>
+                      <Input
+                        id="max-selections-mobile"
+                        type="number"
+                        min={1}
+                        value={maxSelectionsDraft}
+                        onChange={(event) => setMaxSelectionsDraft(event.target.value)}
+                        className="bg-background"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-dashed space-y-4">
+                  <Button
+                    variant="outline"
+                    className="w-full h-24 flex-col gap-2 border-dashed border-2 bg-background/50"
+                    onClick={() => document.getElementById('sheet-upload')?.click()}
+                  >
+                    <Plus className="h-6 w-6 text-muted-foreground" />
+                    <span className="text-xs font-medium">Tải lên ảnh mới</span>
+                    <input
+                      id="sheet-upload"
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleUploadFiles(e.target.files)}
                     />
-                  </div>
-                </div>
-              </div>
+                  </Button>
 
-              <div className="pt-2 border-t border-dashed space-y-4">
-                <Button
-                  variant="outline"
-                  className="w-full h-24 flex-col gap-2 border-dashed border-2 bg-background/50"
-                  onClick={() => document.getElementById('sheet-upload')?.click()}
-                >
-                  <Plus className="h-6 w-6 text-muted-foreground" />
-                  <span className="text-xs font-medium">Tải lên ảnh mới</span>
-                  <input
-                    id="sheet-upload"
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleUploadFiles(e.target.files)}
-                  />
-                </Button>
-                
-                {uploadFiles.length > 0 && (
-                  <div className="space-y-2">
-                    {uploadFiles.map(file => (
-                      <div key={file.id} className="text-xs space-y-1.5 p-3 rounded-xl bg-background border shadow-sm">
-                        <div className="flex justify-between gap-2">
-                          <span className="truncate font-medium">{file.name}</span>
-                          <span className="text-muted-foreground">{file.status === 'complete' ? 'Thành công' : `${file.progress}%`}</span>
+                  {uploadFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {uploadFiles.map(file => (
+                        <div key={file.id} className="text-xs space-y-1.5 p-3 rounded-xl bg-background border shadow-sm">
+                          <div className="flex justify-between gap-2">
+                            <span className="truncate font-medium">{file.name}</span>
+                            <span className="text-muted-foreground">{file.status === 'complete' ? 'Thành công' : `${file.progress}%`}</span>
+                          </div>
+                          <Progress value={file.progress} className="h-1.5" />
                         </div>
-                        <Progress value={file.progress} className="h-1.5" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-              <Button className="h-12 w-full gap-2 rounded-xl text-base shadow-lg" onClick={handleSaveConfig} disabled={saving}>
-                {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                Lưu cấu hình
-              </Button>
+                <Button className="h-12 w-full gap-2 rounded-xl text-base shadow-lg" onClick={handleSaveConfig} disabled={saving}>
+                  {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                  Lưu cấu hình
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </SheetContent>
+        </SheetContent>
       </Sheet>
 
       <StudioLightbox

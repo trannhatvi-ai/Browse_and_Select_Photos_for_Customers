@@ -13,8 +13,13 @@ export async function GET(
   }
 
   const { id } = await params
-  const project = await prisma.project.findUnique({
-    where: { id },
+  const project = await prisma.project.findFirst({
+    where: {
+      OR: [
+        { id },
+        { accessToken: id }
+      ]
+    },
     include: {
       photos: {
         orderBy: { uploadedAt: 'desc' }
