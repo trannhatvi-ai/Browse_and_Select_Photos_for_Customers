@@ -367,58 +367,56 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
         {filteredBySearch.map((project) => (
           <Card key={project.id} className="overflow-hidden">
             <CardContent className="p-4 space-y-3">
-              {/* Top row: Client Name + Status Badge */}
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold truncate">{project.clientName}</h3>
+              {/* Top row: Client Name + Badges */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-bold text-lg truncate leading-none">{project.clientName}</h3>
+                  <div className="flex flex-wrap gap-1.5 shrink-0 justify-end">
+                    <span
+                      className={cn(
+                        'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider',
+                        project.status === 'CHOOSING'
+                          ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                          : 'bg-green-500/10 text-green-600 border border-green-500/20'
+                      )}
+                    >
+                      {project.status === 'CHOOSING' ? 'Đang chọn' : 'Hoàn thành'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20 uppercase tracking-wider">
+                      Hạn: {formatDate(project.deadline)}
+                    </span>
+                  </div>
                 </div>
-                <span
-                  className={cn(
-                    'px-2 py-1 rounded-full text-xs font-medium shrink-0',
-                    project.status === 'CHOOSING'
-                      ? 'bg-amber-500/10 text-amber-600'
-                      : 'bg-green-500/10 text-green-600'
-                  )}
-                >
-                  {project.status === 'CHOOSING' ? 'Khách chọn' : 'Hoàn thành'}
-                </span>
+                <p className="text-sm text-muted-foreground truncate leading-none">{project.eventName}</p>
               </div>
 
-              {/* Middle row: Event Name */}
-              <p className="text-sm text-muted-foreground truncate">{project.eventName}</p>
-
-              {/* Bottom row: Deadline + Quick Actions */}
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="text-xs text-muted-foreground">
-                  Hạn: {formatDate(project.deadline)}
-                </div>
-                <div className="flex items-center gap-2">
+              {/* Bottom row: Quick Actions Only */}
+              <div className="pt-3 border-t">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-11 px-3 text-sm"
+                    className="h-10 px-3 text-xs flex-1 min-w-[80px]"
                     onClick={() => handleViewProject(project.id)}
                   >
-                    <Eye className="mr-1 h-4 w-4" /> Xem
+                    <Eye className="mr-1 h-3.5 w-3.5" /> Xem
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-11 px-3 text-sm text-sky-600 border-sky-200"
-                    title="Mở link gallery"
+                    className="h-10 px-3 text-xs text-sky-600 border-sky-200 flex-1 min-w-[80px]"
                     onClick={() => {
                       if (!project.accessToken) return toast.error('Không có link show chụp')
                       const url = `${window.location.origin}/gallery/${project.accessToken}`
                       window.open(url, '_blank')
                     }}
                   >
-                    <ExternalLink className="mr-1 h-4 w-4" /> Mở
+                    <ExternalLink className="mr-1 h-3.5 w-3.5" /> Mở
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-11 px-3 text-sm"
-                    title="Copy link gửi khách"
+                    className="h-10 px-3 text-xs flex-1 min-w-[100px]"
                     onClick={() => {
                       if (!project.accessToken) return toast.error('Không có link show chụp')
                       const url = `${window.location.origin}/gallery/${project.accessToken}`
@@ -426,12 +424,12 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                       toast.success('Đã copy link gallery!')
                     }}
                   >
-                    <LinkIcon className="mr-1 h-4 w-4" /> Sao chép
+                    <LinkIcon className="mr-1 h-3.5 w-3.5" /> Sao chép
                   </Button>
                   <Button
                     variant="default"
                     size="sm"
-                    className="h-11 px-3 text-sm"
+                    className="h-10 px-3 text-xs flex-1 min-w-[80px] bg-green-600 hover:bg-green-700"
                     onClick={async () => {
                       if (exportLoadingIds.includes(project.id)) return
                       setExportLoadingIds(prev => [...prev, project.id])
@@ -453,9 +451,9 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                     }}
                   >
                     {exportLoadingIds.includes(project.id) ? (
-                      <div className="mr-1 h-4 w-4 rounded-full border-b-2 border-white animate-spin" />
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Download className="mr-1 h-4 w-4" />
+                      <Download className="mr-1 h-3.5 w-3.5" />
                     )} Tải
                   </Button>
                 </div>

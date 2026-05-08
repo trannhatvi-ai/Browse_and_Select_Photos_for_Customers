@@ -82,6 +82,7 @@ export function ClientGallery({ token }: { token?: string }) {
   const [comparisonOpen, setComparisonOpen] = useState(false)
 
   const [isAILoading, setIsAILoading] = useState(false)
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false)
 
   const maxSelections = projectData?.maxSelections || 15
   const selectedCount = photos.filter((p) => p.selected).length
@@ -445,66 +446,64 @@ export function ClientGallery({ token }: { token?: string }) {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <div className="flex items-center justify-between gap-3 sm:justify-start">
-              <div className="flex items-center gap-2">
-                <Camera className="h-6 w-6 text-foreground" />
-                <span className="text-lg font-semibold text-foreground">Studio Pro</span>
-              </div>
-              <span className="text-sm text-muted-foreground sm:hidden">
-                {selectedCount}/{maxSelections}
-              </span>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 shrink-0">
+              <Camera className="h-6 w-6 text-foreground" />
+              <span className="text-lg font-bold text-foreground">Studio Pro</span>
             </div>
 
-            <div className="relative w-full sm:max-w-md sm:flex-1">
-              <Input
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value)
-                  if (!e.target.value.trim()) {
-                    setSemanticMatchedIds(null)
-                    setHighlightedPhotoIds(new Set())
-                  }
-                }}
-                placeholder="Tìm theo mô tả hoặc từ khóa"
-                className="w-full rounded-full pl-10 pr-10"
-                onKeyDown={async (e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    const query = searchQuery.trim()
-                    if (!query) {
-                      clearSemanticSearch()
-                      return
+            {/* Desktop Search - Right aligned */}
+            <div className="hidden sm:flex relative max-w-md flex-1 ml-auto">
+              <div className="relative w-full">
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    if (!e.target.value.trim()) {
+                      setSemanticMatchedIds(null)
+                      setHighlightedPhotoIds(new Set())
                     }
-                    if (semanticLoading) return
-                    await performSemanticSearch(query)
-                  }
-                }}
-              />
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              {searchQuery && (
-                <button
-                  onClick={clearSemanticSearch}
-                  className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-              {semanticLoading && (
-                <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-              )}
+                  }}
+                  placeholder="Tìm theo mô tả..."
+                  className="w-full rounded-full pl-10 pr-10"
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      const query = searchQuery.trim()
+                      if (!query) {
+                        clearSemanticSearch()
+                        return
+                      }
+                      if (semanticLoading) return
+                      await performSemanticSearch(query)
+                    }
+                  }}
+                />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                {searchQuery && (
+                  <button
+                    onClick={clearSemanticSearch}
+                    className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                {semanticLoading && (
+                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                )}
+              </div>
             </div>
 
-            <div className="hidden items-center gap-4 sm:flex">
-              <div>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Tiến độ chọn ảnh</span>
-                  <span className="ml-3 font-medium text-foreground">{selectedCount}/{maxSelections}</span>
+            <div className="flex items-center gap-4 shrink-0">
+              <div className="hidden lg:block text-right">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Tiến độ:</span>
+                  <span className="font-medium text-foreground">{selectedCount}/{maxSelections}</span>
                 </div>
-                <Progress value={progressPercent} className="h-2 w-40" />
+                <Progress value={progressPercent} className="h-1.5 w-24 mt-1" />
               </div>
-              <span className="text-sm text-muted-foreground">
-                Xin chào, <span className="font-medium text-foreground">{projectData?.clientName || 'Khách hàng'}</span>
+              <span className="text-sm font-medium text-foreground lg:hidden">
+                {selectedCount}/{maxSelections}
               </span>
             </div>
           </div>
@@ -552,127 +551,165 @@ export function ClientGallery({ token }: { token?: string }) {
       )}
 
       <div className="sticky top-16 z-30 border-b border-border/60 bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/70">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:overflow-visible lg:pb-0">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-4 py-2 sm:px-6 lg:px-8 no-scrollbar sm:justify-between">
+          <div className={cn(
+            "flex items-center gap-1.5 shrink-0 transition-all duration-300",
+            isSearchExpanded ? "w-0 opacity-0 overflow-hidden" : "w-auto opacity-100"
+          )}>
             <Button
               variant={filter === 'all' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter('all')}
-              aria-pressed={filter === 'all'}
               className={cn(
-                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200 border',
-                filter === 'all'
-                  ? 'border-foreground bg-foreground text-background hover:bg-foreground/90'
-                  : 'border-border/60 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground'
+                'h-8 rounded-full px-3 text-[13px] font-medium transition-all duration-200',
+                filter === 'all' ? 'bg-foreground text-background' : 'bg-transparent text-muted-foreground'
               )}
             >
-              Tất cả ảnh
+              Tất cả
             </Button>
-            <Button
-              variant={filter === 'selected' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter('selected')}
-              aria-pressed={filter === 'selected'}
-              className={cn(
-                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200 gap-1.5 border',
-                filter === 'selected'
-                  ? 'border-foreground bg-foreground text-background hover:bg-foreground/90'
-                  : 'border-border/60 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground'
-              )}
-            >
-              <Heart className={cn('h-3.5 w-3.5 transition-transform', filter === 'selected' && 'fill-current')} />
-              Đã chọn
-            </Button>
-            <Button
-              variant={filter === 'unselected' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter('unselected')}
-              aria-pressed={filter === 'unselected'}
-              className={cn(
-                'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-all duration-200 border',
-                filter === 'unselected'
-                  ? 'border-foreground bg-foreground text-background hover:bg-foreground/90'
-                  : 'border-border/60 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground'
-              )}
-            >
-              Chưa chọn
-            </Button>
-          </div>
+              <Button
+                variant={filter === 'selected' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter('selected')}
+                className={cn(
+                  'h-8 rounded-full px-3 text-[13px] font-medium transition-all duration-200 gap-1.5',
+                  filter === 'selected' ? 'bg-foreground text-background' : 'bg-transparent text-muted-foreground'
+                )}
+              >
+                <Heart className={cn('h-3.5 w-3.5', filter === 'selected' && 'fill-current')} />
+                <span className="hidden sm:inline">Đã chọn</span>
+                <span className="sm:hidden">Đã chọn</span>
+              </Button>
+              <Button
+                variant={filter === 'unselected' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter('unselected')}
+                className={cn(
+                  'h-8 rounded-full px-3 text-[13px] font-medium transition-all duration-200',
+                  filter === 'unselected' ? 'bg-foreground text-background' : 'bg-transparent text-muted-foreground'
+                )}
+              >
+                <span className="hidden sm:inline">Chưa chọn</span>
+                <span className="sm:hidden">Chưa</span>
+              </Button>
+              <div className="w-px h-4 bg-border/40 mx-0.5" />
+            </div>
 
-          <div className="flex items-center gap-2 self-start lg:self-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setComparisonOpen(true)}
-              disabled={filteredPhotos.length < 2}
-              className={cn(
-                'h-9 shrink-0 rounded-full border-border/60 bg-transparent px-4 text-sm font-medium transition-all duration-200 gap-1.5 hover:border-border hover:bg-muted/40 hover:text-foreground',
-                filteredPhotos.length < 2 && 'opacity-60'
+          <div className={cn(
+            "flex items-center gap-1.5 transition-all duration-300 flex-1",
+            isSearchExpanded ? "w-full" : "justify-end"
+          )}>
+            {/* Mobile Expandable Search */}
+            <div className={cn(
+              "relative transition-all duration-300 sm:hidden",
+              isSearchExpanded ? "flex-1" : "w-8"
+            )}>
+              {isSearchExpanded ? (
+                <div className="relative w-full flex items-center">
+                  <Input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onBlur={() => !searchQuery && setIsSearchExpanded(false)}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        if (searchQuery.trim()) await performSemanticSearch(searchQuery.trim())
+                      }
+                    }}
+                    placeholder="Tìm ảnh..."
+                    className="h-8 w-full rounded-full pl-8 pr-8 text-xs bg-muted/50 border-none focus-visible:ring-1"
+                  />
+                  <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <button 
+                    onClick={() => { setIsSearchExpanded(false); clearSemanticSearch(); }}
+                    className="absolute right-2.5"
+                  >
+                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-muted/50"
+                  onClick={() => setIsSearchExpanded(true)}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
               )}
-            >
-              <Columns2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">So sánh ảnh</span>
-              <span className="inline sm:hidden">So sánh</span>
-            </Button>
+            </div>
+
+            <div className={cn(
+              "flex items-center gap-1.5 transition-opacity duration-300",
+              isSearchExpanded && "hidden sm:flex"
+            )}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setComparisonOpen(true)}
+                disabled={filteredPhotos.length < 2}
+                className="h-8 w-8 rounded-full border-border/60 p-0 sm:w-auto sm:px-3 sm:gap-1.5"
+              >
+                <Columns2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">So sánh</span>
+              </Button>
 
             <Popover open={facePopoverOpen} onOpenChange={setFacePopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 w-9 shrink-0 rounded-full border-amber-500/40 bg-amber-500/10 px-0 text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 sm:w-auto sm:px-4"
+                  className="h-8 w-8 rounded-full border-amber-500/30 bg-amber-500/5 p-0 text-amber-700 hover:bg-amber-500/10 sm:w-auto sm:px-3 sm:gap-1.5"
                   title="Tìm ảnh theo khuôn mặt"
                 >
-                  <Sparkles className="h-4 w-4" />
-                  <span className="ml-2 hidden sm:inline">Lọc ảnh theo khuôn mặt</span>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Lọc khuôn mặt</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-72">
-                  <div className="flex flex-col gap-3">
-                    <div className="text-sm font-medium text-foreground">Tìm ảnh theo khuôn mặt</div>
-                    <div className="text-sm text-muted-foreground">
-                      Chọn một ảnh selfie hoặc chụp mới để tìm các ảnh có cùng khuôn mặt.
-                    </div>
-
-                    <input
-                      ref={faceFileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0]
-                        if (f) await handleFaceFile(f)
-                      }}
-                    />
-                    <input
-                      ref={faceCameraInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0]
-                        if (f) await handleFaceFile(f)
-                      }}
-                    />
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openFacePicker('file')}>
-                        Tải ảnh
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => openFacePicker('camera')}>
-                        <Camera className="mr-1 h-4 w-4" />
-                        Chụp ảnh
-                      </Button>
-                    </div>
-
-                    {isAILoading && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Đang quét khuôn mặt...
-                      </div>
-                    )}
+                <div className="flex flex-col gap-3">
+                  <div className="text-sm font-medium text-foreground">Tìm ảnh theo khuôn mặt</div>
+                  <div className="text-sm text-muted-foreground">
+                    Chọn một ảnh selfie hoặc chụp mới để tìm các ảnh có cùng khuôn mặt.
                   </div>
+                  <input
+                    ref={faceFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0]
+                      if (f) await handleFaceFile(f)
+                    }}
+                  />
+                  <input
+                    ref={faceCameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0]
+                      if (f) await handleFaceFile(f)
+                    }}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" onClick={() => openFacePicker('file')}>
+                      Tải ảnh
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => openFacePicker('camera')}>
+                      <Camera className="mr-1 h-4 w-4" />
+                      Chụp ảnh
+                    </Button>
+                  </div>
+                  {isAILoading && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang quét khuôn mặt...
+                    </div>
+                  )}
+                </div>
               </PopoverContent>
             </Popover>
 
@@ -681,11 +718,10 @@ export function ClientGallery({ token }: { token?: string }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 shrink-0 min-w-[128px] justify-between rounded-full border-border/60 bg-transparent px-4 text-sm font-medium transition-all duration-200 gap-2 hover:border-border hover:bg-muted/40 hover:text-foreground"
+                  className="h-8 w-8 rounded-full border-border/60 p-0 sm:w-auto sm:px-3 sm:gap-1.5"
                 >
-                  <span className="hidden sm:inline">Sắp xếp: {sortBy === 'date' ? 'Ngày' : 'Tên file'}</span>
-                  <span className="inline sm:hidden">Sắp xếp</span>
                   <ChevronDown className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Sắp xếp: {sortBy === 'date' ? 'Ngày' : 'Tên'}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -701,6 +737,7 @@ export function ClientGallery({ token }: { token?: string }) {
             </DropdownMenu>
           </div>
         </div>
+      </div>
       </div>
 
       <main className="mx-auto max-w-7xl px-4 py-6 pb-44 sm:px-6 sm:pb-6 lg:px-8">
