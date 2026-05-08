@@ -88,34 +88,35 @@ export function ClientGallery({ token }: { token?: string }) {
   const selectedCount = photos.filter((p) => p.selected).length
   const progressPercent = (selectedCount / maxSelections) * 100
 
-  useEffect(() => {
+  const fetchGalleryData = async () => {
     if (!token) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/gallery/${token}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Mã truy cập không hợp lệ')
+      setProjectData(data)
+      const formatted = data.photos.map((p: any) => ({
+        id: p.id,
+        src: p.previewUrl,
+        originalUrl: p.originalUrl,
+        filename: p.filename,
+        date: p.uploadedAt,
+        selected: p.selected,
+        comment: p.comment,
+        url_hash: p.url_hash, // Preserve hash for search matching
+      }))
+      setPhotos(formatted)
+    } catch (err: any) {
+      alert(err.message)
+      router.push('/')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    fetch(`/api/gallery/${token}`)
-      .then(async (res) => {
-        const data = await res.json()
-        if (!res.ok) {
-          throw new Error(data.error || 'Mã truy cập không hợp lệ')
-        }
-        return data
-      })
-      .then((data) => {
-        setProjectData(data)
-        const formatted = data.photos.map((p: any) => ({
-          id: p.id,
-          src: p.previewUrl,
-          filename: p.filename,
-          date: p.uploadedAt,
-          selected: p.selected,
-          comment: p.comment,
-        }))
-        setPhotos(formatted)
-      })
-      .catch((err) => {
-        alert(err.message)
-        router.push('/')
-      })
-      .finally(() => setLoading(false))
+  useEffect(() => {
+    void fetchGalleryData()
   }, [token, router])
 
   const filteredPhotos = useMemo(() => {
@@ -227,6 +228,38 @@ export function ClientGallery({ token }: { token?: string }) {
     }
   }
 
+  const canonicalizeCloudinaryUrl = (url: string) => {
+    if (!url) return ''
+    try {
+      const parsed = new URL(url)
+      if (!parsed.hostname.includes('res.cloudinary.com')) {
+        return url.split('?')[0]
+      }
+
+      const marker = '/image/upload/'
+      if (!parsed.pathname.includes(marker)) {
+        return url.split('?')[0]
+      }
+
+      const parts = parsed.pathname.split(marker)
+      const prefix = parts[0].replace(/^\//, '')
+      const remainder = parts[1] || ''
+      const segments = remainder.split('/').filter(Boolean)
+      if (segments.length === 0) return url.split('?')[0]
+
+      const versionIndex = segments.findIndex(segment => /^v\d+$/.test(segment))
+      const publicId = versionIndex >= 0 && versionIndex + 1 < segments.length
+        ? segments.slice(versionIndex + 1).join('/')
+        : segments.join('/')
+
+      return prefix
+        ? `${parsed.protocol}//${parsed.hostname}/${prefix}/image/upload/${publicId}`
+        : `${parsed.protocol}//${parsed.hostname}/image/upload/${publicId}`
+    } catch {
+      return url.split('?')[0]
+    }
+  }
+
   const performSemanticSearch = async (query: string) => {
     const projectId = projectData?.id
     if (!projectId) {
@@ -242,21 +275,37 @@ export function ClientGallery({ token }: { token?: string }) {
     }
 
     try {
-      setSemanticLoading(true)
-      setSemanticStatus(`Đang tìm ảnh theo mô tả: "${query}"...`)
-      setSemanticAlert({
-        variant: 'info',
-        title: 'Đang tìm ảnh',
-        description: `Đang tìm ảnh theo mô tả: "${query}"...`,
-      })
+        // Pre-translate query to English for better semantic matching
+        setSemanticLoading(true)
+        let translatedQuery = query
+        try {
+          const tr = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: query }),
+            cache: 'no-store',
+          })
+          if (tr.ok) {
+            const trj = await tr.json()
+            if (trj?.translated_text) translatedQuery = trj.translated_text
+          }
+        } catch {
+          translatedQuery = query
+        }
+        setSemanticStatus(`Đang tìm ảnh theo mô tả: "${translatedQuery}"...`)
+        setSemanticAlert({
+          variant: 'info',
+          title: 'Đang tìm ảnh',
+          description: `Đang tìm ảnh theo mô tả: "${translatedQuery}"...`,
+        })
       setSemanticMatchedIds(null)
       setHighlightedPhotoIds(new Set())
-      const res = await fetch('/api/search/semantic', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId, query, top_k: 50 }),
-        cache: 'no-store',
-      })
+        const res = await fetch('/api/search/semantic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project_id: projectId, query: translatedQuery, top_k: 50 }),
+          cache: 'no-store',
+        })
 
       if (!res.ok) {
         const errorData = await res.json()
@@ -281,22 +330,98 @@ export function ClientGallery({ token }: { token?: string }) {
         }
       }
 
-      const idMap: Record<string, string> = {}
-      for (const p of photos) {
-        const publicId = extractPublicId(p.src)
-        if (publicId) idMap[publicId] = p.id
-        idMap[p.filename] = p.id
+      const normalizeSearchUrl = (url: string) => normalizeCloudinaryUrl(url || '').split('?')[0]
+      const canonicalSearchUrl = (url: string) => canonicalizeCloudinaryUrl(url || '').split('?')[0]
+
+      const photoSearchKeys = (photo: any) => {
+        const keys = new Set<string>()
+        if (photo.url_hash) keys.add(String(photo.url_hash))
+
+        for (const candidate of [photo.src, photo.originalUrl]) {
+          if (!candidate) continue
+          keys.add(candidate)
+          keys.add(normalizeSearchUrl(candidate))
+          keys.add(canonicalSearchUrl(candidate))
+          const publicId = extractPublicId(candidate)
+          if (publicId) {
+            keys.add(publicId)
+            keys.add(publicId.split('/').pop() || publicId)
+          }
+          const filename = candidate.split('/').pop()?.split('?')[0]?.split('.')[0]
+          if (filename) keys.add(filename)
+        }
+
+        if (photo.filename) {
+          keys.add(photo.filename)
+          keys.add(photo.filename.split('.')[0])
+        }
+
+        return [...keys].filter(Boolean)
       }
+
+      const resultSearchKeys = (result: any) => {
+        const url = result.image_url || result.imageUrl || ''
+        const originalUrl = result.metadata?.original_url || ''
+        const keys = new Set<string>()
+        if (result.url_hash) keys.add(String(result.url_hash))
+        if (url) {
+          keys.add(url)
+          keys.add(normalizeSearchUrl(url))
+          keys.add(canonicalSearchUrl(url))
+          const publicId = extractPublicId(url)
+          if (publicId) {
+            keys.add(publicId)
+            keys.add(publicId.split('/').pop() || publicId)
+          }
+          const filename = url.split('/').pop()?.split('?')[0]?.split('.')[0]
+          if (filename) keys.add(filename)
+        }
+        // Also add original_url from metadata
+        if (originalUrl) {
+          keys.add(originalUrl)
+          keys.add(normalizeSearchUrl(originalUrl))
+          keys.add(canonicalSearchUrl(originalUrl))
+          const publicId = extractPublicId(originalUrl)
+          if (publicId) {
+            keys.add(publicId)
+            keys.add(publicId.split('/').pop() || publicId)
+          }
+          const filename = originalUrl.split('/').pop()?.split('?')[0]?.split('.')[0]
+          if (filename) keys.add(filename)
+        }
+        return [...keys].filter(Boolean)
+      }
+
+      // Build a robust mapping from various identifiers to photo IDs
+      const idMap: Record<string, string> = {}
+      console.log('Semantic Search: Building ID Map from photos:', photos.length)
+      for (const p of photos) {
+        const keys = photoSearchKeys(p as any)
+        if (keys.length > 0) {
+          console.log(`  Photo ${p.id}: keys=`, keys)
+        }
+        for (const key of keys) {
+          idMap[key] = p.id
+        }
+      }
+
+      console.log('Semantic Search: Final ID Map size:', Object.keys(idMap).length)
+      console.log('Semantic Search: ID Map keys sample:', Object.keys(idMap).slice(0, 10))
 
       const matches = new Set<string>()
       for (const r of data.results || []) {
-        const resultUrl = r.image_url || r.imageUrl || ''
-        const resultPublicId = extractPublicId(resultUrl)
-
-        let matchedId = idMap[resultPublicId]
+        const resultKeys = resultSearchKeys(r)
+        console.log(`Semantic Search: Result (score=${r.score}): image_url="${r.image_url}", keys=`, resultKeys)
+        let matchedId = null
+        for (const key of resultKeys) {
+          if (idMap[key]) {
+            console.log(`  -> MATCH found! key="${key}" maps to photo ${idMap[key]}`)
+            matchedId = idMap[key]
+            break
+          }
+        }
         if (!matchedId) {
-          const filename = resultUrl.split('/').pop()?.split('.')[0] || ''
-          matchedId = idMap[filename]
+          console.log(`  -> NO MATCH for result. Tried keys: ${resultKeys.join(', ')}`)
         }
 
         if (matchedId) {
@@ -304,7 +429,18 @@ export function ClientGallery({ token }: { token?: string }) {
         }
       }
 
-      console.log(`Semantic Search: Mapped ${matches.size} matches from ${data.results?.length || 0} backend results using PublicID`)
+      console.log(`Semantic Search: Mapped ${matches.size} matches from ${data.results?.length || 0} backend results`)
+      
+      // Update photos with scores
+      setPhotos(prev => prev.map(p => {
+        const result = (data.results || []).find((r: any) => {
+          const resultKeys = resultSearchKeys(r)
+          const photoKeys = photoSearchKeys(p as any)
+          return resultKeys.some(key => photoKeys.includes(key))
+        })
+        return result ? { ...p, score: result.score } : { ...p, score: undefined }
+      }))
+
       setSemanticMatchedIds(matches)
       setHighlightedPhotoIds(matches)
       setSemanticStatus(
@@ -395,6 +531,12 @@ export function ClientGallery({ token }: { token?: string }) {
 
       const urlToId: Record<string, string> = {}
       for (const p of photos) {
+        const photo = p as any
+        // Primary: use url_hash if available
+        if (photo.url_hash) {
+          urlToId[photo.url_hash] = p.id
+        }
+        // Fallbacks
         urlToId[normalizeCloudinaryUrl(p.src)] = p.id
         urlToId[p.src.split('?')[0]] = p.id
         urlToId[p.filename] = p.id
@@ -402,8 +544,20 @@ export function ClientGallery({ token }: { token?: string }) {
 
       const matches = new Set<string>()
       for (const r of data.results || []) {
+        // Primary: match by url_hash
+        const resultHash = r.url_hash
+        if (resultHash && urlToId[resultHash]) {
+          matches.add(urlToId[resultHash])
+          continue
+        }
+
+        // Fallback: match by normalized URL
         const key = normalizeCloudinaryUrl(r.image_url || r.imageUrl || '')
-        const id = urlToId[key] || Object.keys(urlToId).find((k) => k.endsWith(r.image_url?.split('/').pop() || ''))
+        let id = urlToId[key]
+        if (!id) {
+          const filename = r.image_url?.split('/').pop()?.split('.')[0] || ''
+          id = urlToId[filename]
+        }
         if (id) matches.add(urlToId[id] || id)
       }
 
@@ -750,6 +904,8 @@ export function ClientGallery({ token }: { token?: string }) {
               <PhotoCard
                 key={photo.id}
                 photo={photo}
+                projectId={projectData?.id || token}
+                onIndexed={fetchGalleryData}
                 onSelect={handleSelect}
                 onComment={handleOpenComment}
                 onOpen={handleOpenLightbox}

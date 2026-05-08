@@ -80,13 +80,38 @@ export function AIInsightSheet({ photo, open, onOpenChange }: AIInsightSheetProp
 
   if (!photo) return null
 
+  // Small mobile sheet: shorter height and swipe-down-to-close support
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={isMobile ? 'bottom' : 'right'}
-        className={isMobile ? 'h-[92vh] w-full overflow-y-auto rounded-t-3xl px-0' : 'w-full sm:max-w-xl overflow-y-auto px-0'}
+        className={isMobile ? 'h-[70vh] w-full overflow-y-auto rounded-t-3xl px-0' : 'w-full sm:max-w-xl overflow-y-auto px-0'}
       >
-        <div className={isMobile ? 'px-4 pb-8 pt-2 sm:px-6' : 'px-4 pb-6 sm:px-6'}>
+        <div
+          className={isMobile ? 'px-4 pb-8 pt-2 sm:px-6' : 'px-4 pb-6 sm:px-6'}
+          // Enable simple swipe-down-to-close on mobile
+          onTouchStart={e => {
+            if (!isMobile) return
+            ;(e.target as HTMLElement).setAttribute('data-touch-start-y', String(e.touches[0]?.clientY || 0))
+          }}
+          onTouchEnd={e => {
+            if (!isMobile) return
+            try {
+              const start = Number((e.target as HTMLElement).getAttribute('data-touch-start-y') || 0)
+              const end = e.changedTouches[0]?.clientY || 0
+              const delta = end - start
+              if (delta > 60) onOpenChange(false)
+            } catch {
+              /* ignore */
+            }
+          }}
+        >
+          {/* drag handle so users can see a close affordance */}
+          {isMobile ? (
+            <div className="flex items-center justify-center">
+              <div className="mt-2 mb-3 h-0.5 w-12 rounded-full bg-muted-foreground/40" />
+            </div>
+          ) : null}
           <SheetHeader className="space-y-2 pb-4">
             <SheetTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="h-5 w-5 text-amber-500" />

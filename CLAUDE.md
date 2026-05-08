@@ -52,18 +52,93 @@ bd close <id>         # Complete work
 
 ## Build & Test
 
-_Add your build and test commands here_
+Frontend (Next.js):
 
 ```bash
-# Example:
-# npm install
-# npm test
+# from workspace root
+cd frontend
+pnpm install
+pnpm dev    # runs Next.js dev server
+```
+
+Backend (FastAPI - trannhatvi-ai):
+
+```bash
+cd trannhatvi-ai
+python -m venv .venv
+.venv\Scripts\Activate.ps1   # Windows Powershell
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Tests:
+
+```bash
+cd trannhatvi-ai
+pytest -q
 ```
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+This repository implements a photo gallery + AI indexing and search system composed of:
+
+- Frontend: Next.js React app at `frontend/` (client + server components). UI for galleries, admin, and project pages.
+- Backend: FastAPI app at `trannhatvi-ai/` implementing AI analysis, embedding, indexing and vector search coordination.
+- Database: Postgres (via Supabase) stores photo metadata, aiContext, and counts.
+- Vector DB: Qdrant stores vectors in two logical indices: image vectors (primary + chunks) and face vectors.
+- AI Engine: `app.services.ai_engine` provides text/clip/face embeddings and vision-language analysis.
+- Checkpointing: `app.services.checkpointer` persists indexing job state for status/polling and safe resume.
+
+Key design points:
+- Deterministic UUIDs (uuid5) are used for Qdrant point IDs to avoid invalid IDs and ensure idempotent upserts.
+- Each photo has a `primary` representative vector (is_primary=True) plus chunk vectors; semantic search queries primary set first (fast), then reranks candidate photos using chunk vectors (two-phase search).
+- Background indexing is asynchronous and reportable via checkpoint state; single-photo enqueue endpoint exists for user-triggered indexing.
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+- File locations:
+   - Backend API routes: `trannhatvi-ai/app/api/endpoints.py`
+   - Vector DB wrapper: `trannhatvi-ai/app/services/vector_db.py`
+   - Background jobs: `trannhatvi-ai/app/services/background_jobs.py`
+   - DB validators and helpers: `trannhatvi-ai/app/services/db_check.py`
+   - AI engine: `trannhatvi-ai/app/services/ai_engine.py`
+   - Checkpoint manager: `trannhatvi-ai/app/services/checkpointer.py`
+
+- Qdrant usage:
+   - Two collections: `image_index` and `face_index`.
+   - Store `photo_id`, `project_id`, `is_primary` in payload for filtering.
+   - Use deterministic UUID v5 for point IDs.
+
+- API / Endpoints (important):
+   - `POST /projects/{project_id}/photos/{photo_id}/context` — enqueue single-photo full pipeline (context + embeddings). Returns 202.
+   - `GET /tasks/index/{project_id}` — read checkpointed index state for polling progress/status.
+   - `GET /projects/{project_id}/assets` — fetch stored assets (normalizes JSON fields like `clip_embedding`).
+   - `GET /admin/stats/global` and `GET /projects/{project_id}/stats` — admin/project stats now expose both unique images embedded and total vector points.
+   - `POST /search/semantic` and `POST /search/face` — search endpoints used by frontend.
+
+- Frontend integration:
+   - `frontend/components/photo-card.tsx` now contains an "Embed AI" action which calls the single-photo enqueue endpoint and polls `GET /tasks/index/{project_id}` until completion, then refreshes gallery data.
+   - Admin UI `frontend/app/dashboard/settings/page.tsx` displays `indexed_photos_qdrant_images` and `total_vectors_qdrant`.
+
+Developer notes:
+- When editing indexing / upsert logic, ensure point IDs are UUID strings; Qdrant rejects arbitrary strings.
+- Keep chunk-level vectors (for rerank) and also upsert a primary representative per photo.
+- Avoid redundant Cloudinary fetches if `aiContext` exists; allow embedding from stored `aiContext` where applicable.
+
+Operational workflow:
+- To trigger a full system sync use admin endpoints in the UI or `POST /sync/all` (background task).
+- Single-photo flow is suitable for manual corrections or on-demand embedding.
+
+Recent changes (summary):
+- Deterministic point IDs (uuid5) to fix Qdrant 400 errors.
+- Added primary representative vectors and two-phase (primary + chunk rerank) semantic search.
+- Updated background jobs to count indexed photos (unique images) instead of chunk counts for admin stats.
+- Add single-photo enqueue endpoint and a task-status endpoint; frontend updated to call them and refresh UI.
+
+References:
+- Admin settings UI: [frontend/app/dashboard/settings/page.tsx](frontend/app/dashboard/settings/page.tsx)
+- Photo UI + enqueue: [frontend/components/photo-card.tsx](frontend/components/photo-card.tsx)
+- Gallery: [frontend/components/client-gallery.tsx](frontend/components/client-gallery.tsx)
+- Qdrant tuning doc: [docs/QDRANT_TUNING.md](docs/QDRANT_TUNING.md)
+
+If you want, I can also append a troubleshooting checklist for common runtime errors (Qdrant ID errors, UnboundLocalError, DB count mismatches).

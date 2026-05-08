@@ -98,6 +98,11 @@ export default function ProjectDetailPage() {
   const [syncingAi, setSyncingAi] = useState(false)
   const [realProjectId, setRealProjectId] = useState<string | null>(null)
 
+  const aiSyncCompleted = Boolean(aiStats && aiStats.indexed_photos_qdrant >= aiStats.total_photos && aiStats.total_photos > 0)
+  const aiSyncTooltip = aiSyncCompleted
+    ? 'Tất cả ảnh đã sẵn sàng, không cần tạo ngữ cảnh nữa'
+    : 'Tạo mô tả AI cho các ảnh mới'
+
   const fetchAiStats = async (idOverride?: string) => {
     const idToUse = idOverride || realProjectId || projectId
     if (!idToUse) return
@@ -484,14 +489,16 @@ export default function ProjectDetailPage() {
         <aside className="hidden lg:block">
           <div className="sticky top-24 space-y-6">
               <div className="space-y-3 pt-2">
-                <Button
-                  className={cn(
-                    "w-full h-12 rounded-2xl shadow-lg transition-all",
-                    allIndexed ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-50 cursor-default" : "bg-amber-500 hover:bg-amber-600 text-white"
-                  )}
-                  title={allIndexed ? "Đã tạo tất cả ngữ cảnh của các bức ảnh" : "Tạo mô tả AI cho các ảnh mới"}
-                  onClick={async () => {
-                    if (allIndexed) return
+                <div title={aiSyncTooltip} className="w-full">
+                  <Button
+                    className={cn(
+                      'w-full h-12 rounded-2xl shadow-lg transition-all',
+                      aiSyncCompleted
+                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 cursor-not-allowed opacity-90'
+                        : 'bg-amber-500 hover:bg-amber-600 text-white'
+                    )}
+                    onClick={async () => {
+                    if (aiSyncCompleted) return
                     setSyncingAi(true)
                     try {
                       const idToUse = realProjectId || project.id
@@ -508,22 +515,23 @@ export default function ProjectDetailPage() {
                     } finally {
                       setSyncingAi(false)
                     }
-                  }}
-                  disabled={syncingAi}
-                >
-                  {syncingAi ? (
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  ) : allIndexed ? (
-                    <CheckCircle2 className="h-5 w-5 mr-2" />
-                  ) : (
-                    <Sparkles className="h-5 w-5 mr-2" />
-                  )}
-                  {allIndexed ? "Đã hoàn thành AI" : "Tạo ngữ cảnh AI"}
-                </Button>
+                    }}
+                    disabled={syncingAi || aiSyncCompleted}
+                  >
+                    {syncingAi ? (
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    ) : aiSyncCompleted ? (
+                      <CheckCircle2 className="h-5 w-5 mr-2" />
+                    ) : (
+                      <Sparkles className="h-5 w-5 mr-2" />
+                    )}
+                    {aiSyncCompleted ? 'Đã hoàn thành AI' : 'Tạo ngữ cảnh AI'}
+                  </Button>
+                </div>
                 
-                {!allIndexed && aiStats && aiStats.total_photos > 0 && (
+                {!aiSyncCompleted && aiStats && aiStats.total_photos > 0 && (
                    <p className="text-[10px] text-center text-muted-foreground italic">
-                     Tiến độ: {aiStats.indexed_photos_qdrant}/{aiStats.total_photos} ảnh sẵn sàng
+                     Tiến độ: {aiStats.indexed_photos_qdrant_images ?? aiStats.indexed_photos_qdrant ?? 0}/{aiStats.total_photos} ảnh sẵn sàng
                    </p>
                 )}
               </div>
@@ -634,8 +642,13 @@ export default function ProjectDetailPage() {
 
 
       <Sheet open={configOpen} onOpenChange={setConfigOpen}>
-        <SheetContent side={isMobile ? 'bottom' : 'right'} className={isMobile ? 'h-[85vh] w-full overflow-y-auto rounded-t-xl border-none px-0' : 'w-full overflow-y-auto sm:max-w-md px-0'}>
+        <SheetContent side={isMobile ? 'bottom' : 'right'} className={isMobile ? 'h-[72vh] w-full overflow-y-auto rounded-t-3xl border-none px-0' : 'w-full overflow-y-auto sm:max-w-md px-0'}>
           <div className="px-4 pb-8 pt-2 sm:px-6">
+            {isMobile ? (
+              <div className="flex items-center justify-center">
+                <div className="mb-4 h-1.5 w-14 rounded-full bg-muted-foreground/25" />
+              </div>
+            ) : null}
             <SheetHeader className="space-y-2 pb-6">
               <SheetTitle className="flex items-center gap-2 text-lg">
                 <Settings2 className="h-5 w-5 text-primary" />
@@ -647,35 +660,38 @@ export default function ProjectDetailPage() {
             </SheetHeader>
 
             <div className="mb-6 space-y-3">
-              <Button
-                className={cn(
-                  "w-full h-12 rounded-2xl shadow-lg transition-all",
-                  allIndexed ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-500 text-white"
-                )}
-                onClick={async () => {
-                  if (allIndexed) return
-                  setSyncingAi(true)
-                  try {
-                    const idToUse = realProjectId || project.id
-                    const res = await fetch(`/api/ai-stats/projects/${idToUse}/sync`, { method: 'POST' })
-                    if (res.ok) {
-                      const data = await res.json()
-                      toast.success(`Đã bắt đầu tạo ngữ cảnh cho ${data.queued_count} ảnh!`)
-                      setTimeout(fetchAiStats, 2000)
+              <div title={aiSyncTooltip} className="w-full">
+                <Button
+                  className={cn(
+                    'w-full h-12 rounded-2xl shadow-lg transition-all',
+                    aiSyncCompleted
+                      ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 cursor-not-allowed opacity-90'
+                      : 'bg-amber-500 text-white hover:bg-amber-600'
+                  )}
+                  onClick={async () => {
+                    if (aiSyncCompleted) return
+                    setSyncingAi(true)
+                    try {
+                      const idToUse = realProjectId || project.id
+                      const res = await fetch(`/api/ai-stats/projects/${idToUse}/sync`, { method: 'POST' })
+                      if (res.ok) {
+                        const data = await res.json()
+                        toast.success(`Đã bắt đầu tạo ngữ cảnh cho ${data.queued_count} ảnh!`)
+                        setTimeout(fetchAiStats, 2000)
+                      }
+                    } catch (err) {} finally {
+                      setSyncingAi(false)
                     }
-                  } catch (err) {} finally {
-                    setSyncingAi(false)
-                  }
-                }}
-                disabled={syncingAi}
-              >
-                {syncingAi ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : allIndexed ? <CheckCircle2 className="h-5 w-5 mr-2" /> : <Sparkles className="h-5 w-5 mr-2" />}
-                {allIndexed ? "Đã hoàn thành AI" : "Tạo ngữ cảnh AI"}
-              </Button>
+                  }}
+                  disabled={syncingAi}
+                >
+                  {syncingAi ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : aiSyncCompleted ? <CheckCircle2 className="h-5 w-5 mr-2" /> : <Sparkles className="h-5 w-5 mr-2" />}
+                  {aiSyncCompleted ? 'Đã hoàn thành AI' : 'Tạo ngữ cảnh AI'}
+                </Button>
+              </div>
             </div>
 
-
-              <div className="rounded-2xl border bg-muted/30 p-4 space-y-6">
+              <div className="rounded-3xl border border-border/70 bg-gradient-to-b from-muted/40 to-background p-4 shadow-sm space-y-6 sm:p-5">
                 <div className="space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="event-name" className="text-xs text-muted-foreground">Tên sự kiện</Label>
@@ -720,7 +736,7 @@ export default function ProjectDetailPage() {
                 <div className="pt-2 border-t border-dashed space-y-4">
                   <Button
                     variant="outline"
-                    className="w-full h-24 flex-col gap-2 border-dashed border-2 bg-background/50"
+                    className="w-full h-20 flex-col gap-2 rounded-2xl border-dashed border-2 bg-background/70 shadow-sm"
                     onClick={() => document.getElementById('sheet-upload')?.click()}
                   >
                     <Plus className="h-6 w-6 text-muted-foreground" />
@@ -750,7 +766,7 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
 
-                <Button className="h-12 w-full gap-2 rounded-xl text-base shadow-lg" onClick={handleSaveConfig} disabled={saving}>
+                <Button className="h-12 w-full gap-2 rounded-2xl text-base shadow-lg" onClick={handleSaveConfig} disabled={saving}>
                   {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                   Lưu cấu hình
                 </Button>

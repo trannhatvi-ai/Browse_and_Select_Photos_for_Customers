@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Heart, MessageCircle, Star } from 'lucide-react'
+import { Heart, MessageCircle, Star, Loader2, FlaskConical } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { Photo } from '@/lib/types'
 
@@ -13,12 +14,67 @@ interface PhotoCardProps {
   highlighted?: boolean
   aiGroupSize?: number | undefined
   onShowGroup?: (groupId: string | undefined) => void
+  projectId?: string
+  onIndexed?: () => void
 }
 
-export function PhotoCard({ photo, onSelect, onComment, onOpen, highlighted, aiGroupSize }: PhotoCardProps) {
+export function PhotoCard({ photo, onSelect, onComment, onOpen, highlighted, aiGroupSize, projectId: propProjectId, onIndexed }: PhotoCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [indexing, setIndexing] = useState(false)
+  const [indexProgress, setIndexProgress] = useState<number | null>(null)
   highlighted = highlighted ?? false
+
+  const projectId = propProjectId || (photo as any).projectId || (photo as any).project_id
+
+  const handleEmbedClick = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!projectId) {
+      toast.error('Thiếu project ID')
+      return
+    }
+    try {
+      setIndexing(true)
+      setIndexProgress(0)
+      const res = await fetch(`/api/projects/${projectId}/photos/${photo.id}/context?embed_face=true`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || data.message || `HTTP ${res.status}`)
+      }
+
+      // Poll status endpoint until completion or timeout
+      const maxPolls = 60 // ~2 minutes
+      for (let i = 0; i < maxPolls; i++) {
+        await new Promise((r) => setTimeout(r, 2000))
+        try {
+          const s = await fetch(`/api/tasks/index/${projectId}`)
+          if (!s.ok) continue
+          const state = await s.json()
+          const pct = state.percentage ?? state.progress ?? null
+          if (typeof pct === 'number') setIndexProgress(Math.round(pct))
+          if ((state.percentage && state.percentage >= 100) || state.status === 'completed') {
+            toast.success('Ảnh đã được embed xong')
+            setIndexing(false)
+            setIndexProgress(null)
+            if (typeof onIndexed === 'function') onIndexed()
+            return
+          }
+        } catch (err) {
+          // ignore transient errors
+        }
+      }
+
+      toast.success('Yêu cầu đã được xếp hàng; kiểm tra trạng thái sau')
+    } catch (err: any) {
+      console.error('Embed error', err)
+      toast.error(err?.message || 'Lỗi khi gửi yêu cầu embed')
+    } finally {
+      setIndexing(false)
+      setIndexProgress(null)
+    }
+  }
 
   return (
     <div
@@ -99,6 +155,13 @@ export function PhotoCard({ photo, onSelect, onComment, onOpen, highlighted, aiG
       {photo.comment && (
         <div className="absolute top-3 right-3 flex h-8 w-8 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary z-20">
           <MessageCircle className="h-4 w-4 sm:h-3.5 sm:w-3.5 fill-white text-white" />
+        </div>
+      )}
+      
+      {/* Search Score Badge */}
+      {photo.score !== undefined && (
+        <div className="absolute top-3 right-12 z-20 flex items-center gap-1 rounded-full bg-indigo-600/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
+          <span>{Math.round(photo.score * 100)}%</span>
         </div>
       )}
 

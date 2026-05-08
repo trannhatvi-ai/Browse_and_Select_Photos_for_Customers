@@ -63,8 +63,8 @@ export default function SettingsPage() {
   const [vlmApiBase, setVlmApiBase] = useState('https://models.inference.ai.azure.com')
   const [vlmModelId, setVlmModelId] = useState('gpt-4o-mini')
   const [activeTasks, setActiveTasks] = useState<any[]>([])
-  const [lastTaskCount, setLastTaskCount] = useState(0)
 
+  // Auto-open Cloudinary guide when redirected from project creation
   const fetchGlobalStats = async () => {
     setLoadingStats(true)
     try {
@@ -72,9 +72,11 @@ export default function SettingsPage() {
       if (res.ok) {
         const data = await res.json()
         setGlobalStats(data)
+      } else {
+        toast.error('Lỗi tải số liệu hệ thống')
       }
-    } catch (e) {
-      console.error(e)
+    } catch {
+      toast.error('Lỗi kết nối server')
     } finally {
       setLoadingStats(false)
     }
@@ -84,38 +86,18 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/ai-stats/admin/tasks/active')
       if (res.ok) {
-        const tasks = await res.json()
-        setActiveTasks(tasks)
-        
-        // Thông báo khi hoàn thành
-        if (lastTaskCount > 0 && tasks.length === 0) {
-          toast.success('Hệ thống đã hoàn tất tất cả tác vụ xử lý ảnh!')
-          void fetchGlobalStats()
-        }
-        setLastTaskCount(tasks.length)
+        const data = await res.json()
+        setActiveTasks(Array.isArray(data) ? data : (data.tasks || []))
       }
-    } catch (e) {
-      console.error(e)
-    }
+    } catch {}
   }
 
-  // Auto-open Cloudinary guide when redirected from project creation
   useEffect(() => {
-    if (userRole === 'ADMIN') {
-      void fetchGlobalStats()
-      void fetchActiveTasks()
-      
-      const interval = setInterval(() => {
-        const hasActiveTasks = activeTasks.length > 0 || syncingFull || syncingIncremental;
-        if (hasActiveTasks || (globalStats?.percentage_qdrant ?? 0) < 100) {
-           void fetchGlobalStats()
-           void fetchActiveTasks()
-        }
-      }, 3000)
-      
-      return () => clearInterval(interval)
-    }
-  }, [userRole, activeTasks.length, globalStats?.percentage_qdrant, syncingFull, syncingIncremental])
+    if (userRole !== 'ADMIN') return
+    
+    void fetchGlobalStats()
+    void fetchActiveTasks()
+  }, [userRole])
 
   useEffect(() => {
     if (searchParams.get('setup') === 'cloudinary') {
@@ -193,7 +175,8 @@ export default function SettingsPage() {
     if (ctx === 'all' && vec === 'all') setSyncingFull(true)
     else setSyncingIncremental(true)
 
-    const promise = fetch(`/api/ai-stats/sync/mode?sync_context=${ctx}&sync_vector=${vec}`, { method: 'POST' }).then(async res => {
+    const fullRebuild = ctx === 'all' || vec === 'all'
+    const promise = fetch(`/api/admin/sync-ai?fullRebuild=${fullRebuild}`, { method: 'POST' }).then(async res => {
       if (!res.ok) {
         let message = 'Lỗi đồng bộ'
         try {
@@ -320,25 +303,33 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2 mb-4">
+<div className="grid gap-4 sm:grid-cols-3 mb-4">
                    <div className="rounded-xl border bg-blue-50/50 p-4 space-y-2">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="font-medium text-blue-700">Database Context</span>
-                        <span className="font-bold">{globalStats?.context_photos_db ?? 0} / {globalStats?.total_photos ?? 0}</span>
-                      </div>
-                      <Progress value={globalStats?.percentage_db ?? 0} className="h-2 bg-blue-100" />
-                      <p className="text-[10px] text-blue-600 italic">Tổng ảnh đã có mô tả AI lưu trong Postgres</p>
-                   </div>
-                   
-                   <div className="rounded-xl border bg-emerald-50/50 p-4 space-y-2">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="font-medium text-emerald-700">Qdrant Indexing</span>
-                        <span className="font-bold">{globalStats?.indexed_photos_qdrant ?? 0} / {globalStats?.total_photos ?? 0}</span>
-                      </div>
-                      <Progress value={globalStats?.percentage_qdrant ?? 0} className="h-2 bg-emerald-100" />
-                      <p className="text-[10px] text-emerald-600 italic">Tổng ảnh đã sẵn sàng để tìm kiếm (Vector)</p>
-                   </div>
-                </div>
+                       <div className="flex justify-between items-center text-sm">
+                         <span className="font-medium text-blue-700">Database Context</span>
+                         <span className="font-bold">{globalStats?.context_photos_db ?? 0} / {globalStats?.total_photos ?? 0}</span>
+                       </div>
+                       <Progress value={globalStats?.percentage_db ?? 0} className="h-2 bg-blue-100" />
+                       <p className="text-[10px] text-blue-600 italic">Tổng ảnh đã có mô tả AI lưu trong Postgres</p>
+                    </div>
+                    
+                    <div className="rounded-xl border bg-emerald-50/50 p-4 space-y-2">
+                       <div className="flex justify-between items-center text-sm">
+                         <span className="font-medium text-emerald-700">Ảnh đã embed (Qdrant)</span>
+                         <span className="font-bold">{globalStats?.indexed_photos_qdrant_images ?? 0} / {globalStats?.total_photos ?? 0}</span>
+                       </div>
+                       <Progress value={globalStats?.percentage_qdrant ?? 0} className="h-2 bg-emerald-100" />
+                       <p className="text-[10px] text-emerald-600 italic">Số ảnh duy nhất đã được embed vào Qdrant</p>
+                    </div>
+
+                    <div className="rounded-xl border bg-purple-50/50 p-4 space-y-2">
+                       <div className="flex justify-between items-center text-sm">
+                         <span className="font-medium text-purple-700">Tổng Vector Qdrant</span>
+                         <span className="font-bold">{globalStats?.total_vectors_qdrant?.toLocaleString() ?? 0}</span>
+                       </div>
+                       <p className="text-[10px] text-purple-600 italic">Tổng số vector embedding trong Qdrant</p>
+                    </div>
+                 </div>
 
                 <Button 
                   variant="outline" 
@@ -436,14 +427,14 @@ export default function SettingsPage() {
                         Đang xử lý {activeTasks.length} tác vụ...
                       </p>
                     </div>
-                    <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
-                      {activeTasks.map((task: any) => (
-                        <div key={task.task_id} className="space-y-1.5">
+                      <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
+                      {activeTasks.map((task: any, idx: number) => (
+                        <div key={`${task?.task_id ?? 'active'}-${idx}`} className="space-y-1.5">
                           <div className="flex justify-between text-[10px]">
-                            <span className="font-medium truncate max-w-[200px]">Project: {task.task_id.replace('index:', '')}</span>
-                            <span className="font-bold">{task.percentage}% ({task.processed_count}/{task.total_count})</span>
+                            <span className="font-medium truncate max-w-[200px]">Project: {task.task_id?.replace('index:', '') ?? 'N/A'}</span>
+                            <span className="font-bold">{task.percentage ?? 0}% ({task.processed_count ?? 0}/{task.total_count ?? 0})</span>
                           </div>
-                          <Progress value={task.percentage} className="h-1" />
+                          <Progress value={task.percentage ?? 0} className="h-1" />
                         </div>
                       ))}
                     </div>

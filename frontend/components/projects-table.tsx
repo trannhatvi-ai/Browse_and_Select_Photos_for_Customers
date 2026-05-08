@@ -309,7 +309,7 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                         </Button>
                         <Button
                           variant="default" size="icon"
-                          className="h-8 w-8 bg-green-600 hover:bg-green-700"
+                          className="h-8 w-8 border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
                           title="Tải danh sách ảnh khách chọn"
                           onClick={async () => {
                             if (exportLoadingIds.includes(project.id)) return
@@ -337,8 +337,13 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                             <Download className="h-4 w-4" />
                           )}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleViewProject(project.accessToken)}>
-                          <Eye className="mr-1.5 h-4 w-4" /> Xem
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 border-slate-300 bg-slate-50 text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-100 hover:text-slate-900"
+                          onClick={() => handleViewProject(project.accessToken)}
+                        >
+                          <Eye className="mr-1.5 h-4 w-4" /> Chi tiết
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -393,30 +398,12 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
               {/* Bottom row: Quick Actions Only */}
               <div className="pt-3 border-t">
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  {/* Mobile: icons only except View (keeps text). Order: Copy, View, Download, Open */}
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-10 px-3 text-xs flex-1 min-w-[80px]"
-                    onClick={() => handleViewProject(project.accessToken)}
-                  >
-                    <Eye className="mr-1 h-3.5 w-3.5" /> Xem
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-10 px-3 text-xs text-sky-600 border-sky-200 flex-1 min-w-[80px]"
-                    onClick={() => {
-                      if (!project.accessToken) return toast.error('Không có link show chụp')
-                      const url = `${window.location.origin}/gallery/${project.accessToken}`
-                      window.open(url, '_blank')
-                    }}
-                  >
-                    <ExternalLink className="mr-1 h-3.5 w-3.5" /> Mở
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-10 px-3 text-xs flex-1 min-w-[100px]"
+                    className="h-10 px-3 text-xs flex-none"
+                    aria-label="Sao chép link"
                     onClick={() => {
                       if (!project.accessToken) return toast.error('Không có link show chụp')
                       const url = `${window.location.origin}/gallery/${project.accessToken}`
@@ -424,12 +411,23 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                       toast.success('Đã copy link gallery!')
                     }}
                   >
-                    <LinkIcon className="mr-1 h-3.5 w-3.5" /> Sao chép
+                    <LinkIcon className="h-4 w-4" />
                   </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-10 px-3 text-xs flex-1 min-w-[80px] border-slate-300 bg-slate-50 text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-100 hover:text-slate-900"
+                    onClick={() => handleViewProject(project.accessToken)}
+                  >
+                    <Eye className="mr-1 h-3.5 w-3.5" /> Chi tiết
+                  </Button>
+
                   <Button
                     variant="default"
                     size="sm"
-                    className="h-10 px-3 text-xs flex-1 min-w-[80px] bg-green-600 hover:bg-green-700"
+                    className="h-10 px-3 text-xs flex-none border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
+                    aria-label="Tải danh sách"
                     onClick={async () => {
                       if (exportLoadingIds.includes(project.id)) return
                       setExportLoadingIds(prev => [...prev, project.id])
@@ -451,10 +449,24 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                     }}
                   >
                     {exportLoadingIds.includes(project.id) ? (
-                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Download className="mr-1 h-3.5 w-3.5" />
-                    )} Tải
+                      <Download className="h-4 w-4" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-10 px-3 text-xs flex-none"
+                    aria-label="Mở gallery"
+                    onClick={() => {
+                      if (!project.accessToken) return toast.error('Không có link show chụp')
+                      const url = `${window.location.origin}/gallery/${project.accessToken}`
+                      window.open(url, '_blank')
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

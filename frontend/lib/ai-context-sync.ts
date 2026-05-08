@@ -78,6 +78,8 @@ export async function syncProjectPhotoAiContexts(
         if (readyCount === targetPhotos.length) {
           break
         }
+      } else if (response.status === 404) {
+        break
       }
     } catch {
       // Keep polling until timeout.

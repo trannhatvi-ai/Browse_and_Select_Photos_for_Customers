@@ -1,6 +1,7 @@
 export interface Photo {
   id: string
   src: string
+  originalUrl?: string | null
   filename: string
   date: string
   selected: boolean
@@ -10,6 +11,9 @@ export interface Photo {
   aiGroupId?: string
   aiBestShot?: boolean
   aiGroupSize?: number
+  // For search result matching
+  url_hash?: string | null
+  score?: number
 }
 
 export interface Project {

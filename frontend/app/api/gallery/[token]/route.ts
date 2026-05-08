@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { createHash } from 'crypto'
 
 export async function GET(
   req: NextRequest,
@@ -18,6 +19,7 @@ export async function GET(
           id: true,
           filename: true,
           previewUrl: true,
+          originalUrl: true,
           selected: true,
           comment: true,
         },
@@ -40,6 +42,13 @@ export async function GET(
     )
   }
 
+  // Add url_hash to each photo for reliable search matching (hash of originalUrl to match backend search results)
+  const crypto = require('crypto')
+  const enrichedPhotos = project.photos.map(photo => ({
+    ...photo,
+    url_hash: photo.originalUrl ? crypto.createHash('sha256').update(photo.originalUrl).digest('hex') : null
+  }))
+
   const { accessToken, accessPassword, ...publicProject } = project
-  return NextResponse.json(publicProject)
+  return NextResponse.json({ ...publicProject, photos: enrichedPhotos })
 }
