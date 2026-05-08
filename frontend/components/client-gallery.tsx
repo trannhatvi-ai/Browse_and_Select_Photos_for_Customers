@@ -69,6 +69,7 @@ export function ClientGallery({ token }: { token?: string }) {
     description: string
   } | null>(null)
   const [semanticMatchedIds, setSemanticMatchedIds] = useState<Set<string> | null>(null)
+  const [semanticScores, setSemanticScores] = useState<Map<string, number>>(new Map())
   const [facePopoverOpen, setFacePopoverOpen] = useState(false)
   const faceFileInputRef = useRef<HTMLInputElement | null>(null)
   const faceCameraInputRef = useRef<HTMLInputElement | null>(null)
@@ -200,6 +201,7 @@ export function ClientGallery({ token }: { token?: string }) {
     setSearchQuery('')
     setSemanticMatchedIds(null)
     setHighlightedPhotoIds(new Set())
+    setSemanticScores(new Map())
     setSemanticAlert(null)
   }
 
@@ -214,13 +216,29 @@ export function ClientGallery({ token }: { token?: string }) {
       })
       if (!res.ok) throw new Error()
       const data = await res.json()
-      // logic mapping assumes simple ID match for demo; in production use robust hash matching
-      const matches = new Set<string>(data.results?.map((r: any) => r.id) || [])
+      console.log('[semantic search] qdrant response', data)
+      const getFileId = (url: string) => url ? url.split('/').pop()?.split('.')[0] || '' : ''
+      const returnedScoreMap = new Map(data.results?.map((r: any) => [getFileId(r.image_url || r.metadata?.original_url), r.score]) || [])
+      const matchedIds = photos.filter(p => returnedScoreMap.has(getFileId(p.originalUrl)) || returnedScoreMap.has(getFileId(p.src))).map(p => p.id)
+      const matches = new Set<string>(matchedIds)
+      
+      const scores = new Map<string, number>()
+      photos.forEach(p => {
+        const score = returnedScoreMap.get(getFileId(p.originalUrl)) || returnedScoreMap.get(getFileId(p.src))
+        if (score !== undefined) scores.set(p.id, score)
+      })
+
       setSemanticMatchedIds(matches)
       setHighlightedPhotoIds(matches)
-      setSemanticAlert({ variant: 'success', title: 'Xong', description: `Tìm thấy ${matches.size} ảnh.` })
-      if (semanticAlertTimerRef.current) window.clearTimeout(semanticAlertTimerRef.current)
-      semanticAlertTimerRef.current = window.setTimeout(() => setSemanticAlert(null), 3000)
+      setSemanticScores(scores)
+      
+      if (matches.size === 0) {
+        setSemanticAlert({ variant: 'error', title: 'Lỗi', description: 'Không tìm thấy kết quả phù hợp.' })
+        if (semanticAlertTimerRef.current) window.clearTimeout(semanticAlertTimerRef.current)
+        semanticAlertTimerRef.current = window.setTimeout(() => setSemanticAlert(null), 3000)
+      } else {
+        setSemanticAlert(null)
+      }
     } catch {
       setSemanticAlert({ variant: 'error', title: 'Lỗi', description: 'Không tìm thấy kết quả.' })
     } finally {
@@ -238,9 +256,20 @@ export function ClientGallery({ token }: { token?: string }) {
       const res = await fetch('/api/search/face', { method: 'POST', body: formData })
       if (!res.ok) throw new Error()
       const data = await res.json()
-      const matches = new Set<string>(data.results?.map((r: any) => r.id) || [])
+      const getFileId = (url: string) => url ? url.split('/').pop()?.split('.')[0] || '' : ''
+      const returnedScoreMap = new Map(data.results?.map((r: any) => [getFileId(r.image_url || r.metadata?.original_url), r.score || 1]) || [])
+      const matchedIds = photos.filter(p => returnedScoreMap.has(getFileId(p.originalUrl)) || returnedScoreMap.has(getFileId(p.src))).map(p => p.id)
+      const matches = new Set<string>(matchedIds)
+      
+      const scores = new Map<string, number>()
+      photos.forEach(p => {
+        const score = returnedScoreMap.get(getFileId(p.originalUrl)) || returnedScoreMap.get(getFileId(p.src))
+        if (score !== undefined) scores.set(p.id, score)
+      })
+
       setSemanticMatchedIds(matches)
       setHighlightedPhotoIds(matches)
+      setSemanticScores(scores)
     } catch {
       alert('Lỗi tìm kiếm khuôn mặt')
     } finally {
@@ -280,17 +309,28 @@ export function ClientGallery({ token }: { token?: string }) {
               <Input
                 autoFocus={isSearchExpanded}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  if (!e.target.value.trim()) clearSemanticSearch()
+                }}
                 onBlur={() => !searchQuery && setIsSearchExpanded(false)}
                 placeholder="Tìm ảnh bằng AI..."
-                className="relative h-10 w-full rounded-xl pl-10 bg-background border-2 border-sky-500/50 focus-visible:ring-2 focus-visible:ring-sky-500"
-                onKeyDown={(e) => e.key === 'Enter' && performSemanticSearch(searchQuery.trim())}
+                disabled={semanticLoading}
+                className={cn(
+                  "relative h-10 w-full rounded-xl pl-10 bg-background border-2 border-sky-500/50 focus-visible:ring-2 focus-visible:ring-sky-500",
+                  semanticLoading && "opacity-70 cursor-not-allowed"
+                )}
+                onKeyDown={(e) => e.key === 'Enter' && !semanticLoading && performSemanticSearch(searchQuery.trim())}
               />
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-500" />
-              {searchQuery && (
+              {semanticLoading ? (
+                <Loader2 className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-500 animate-spin" />
+              ) : (
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-500" />
+              )}
+              {searchQuery && !semanticLoading && (
                 <button 
                   onClick={() => { clearSemanticSearch(); setIsSearchExpanded(false); }} 
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-full transition-colors"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -373,7 +413,7 @@ export function ClientGallery({ token }: { token?: string }) {
       <main className="mx-auto max-w-7xl px-4 py-6 pb-44 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filteredPhotos.map((photo) => (
-            <PhotoCard key={photo.id} photo={photo} onSelect={handleSelect} onComment={handleOpenComment} onOpen={handleOpenLightbox} />
+            <PhotoCard key={photo.id} photo={{...photo, score: semanticScores.get(photo.id)}} highlighted={highlightedPhotoIds.has(photo.id)} onSelect={handleSelect} onComment={handleOpenComment} onOpen={handleOpenLightbox} />
           ))}
         </div>
       </main>

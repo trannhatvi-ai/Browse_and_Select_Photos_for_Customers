@@ -81,7 +81,7 @@ export function PhotoCard({ photo, onSelect, onComment, onOpen, highlighted, aiG
       className={cn(
         'group relative aspect-[4/3] overflow-hidden rounded-lg bg-muted cursor-pointer transition-all',
         photo.selected && 'ring-2 ring-accent ring-offset-2 ring-offset-background shadow-md',
-        highlighted && 'ring-4 ring-indigo-400/40'
+        highlighted && 'ring-2 ring-sky-400/80'
       )}
       data-photo-id={photo.id}
       data-ai-group={photo.aiGroupId}
@@ -148,7 +148,7 @@ export function PhotoCard({ photo, onSelect, onComment, onOpen, highlighted, aiG
 
       {/* Highlight overlay when result of search */}
       {highlighted && (
-        <div className="absolute inset-0 z-40 rounded-lg ring-4 ring-indigo-400/60 pointer-events-none" />
+        <div className="absolute inset-0 z-40 rounded-lg ring-2 ring-sky-400/80 pointer-events-none" />
       )}
 
       {/* Comment indicator - Layer 20 */}
@@ -160,7 +160,7 @@ export function PhotoCard({ photo, onSelect, onComment, onOpen, highlighted, aiG
       
       {/* Search Score Badge */}
       {photo.score !== undefined && (
-        <div className="absolute top-3 right-12 z-20 flex items-center gap-1 rounded-full bg-indigo-600/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
+        <div className={cn("absolute top-3 z-20 flex items-center gap-1 rounded-full bg-sky-500/90 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-sm", (photo.comment || (photo.aiGroupSize && photo.aiGroupSize > 1)) ? "right-12" : "right-3")}>
           <span>{Math.round(photo.score * 100)}%</span>
         </div>
       )}
