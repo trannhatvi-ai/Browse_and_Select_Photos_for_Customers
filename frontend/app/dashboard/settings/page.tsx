@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { ExternalLink, Save, Loader2, FlaskConical, Info } from 'lucide-react'
+import { ExternalLink, Save, Loader2, FlaskConical, Info, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -34,6 +34,7 @@ export default function SettingsPage() {
   const [syncingIncremental, setSyncingIncremental] = useState(false)
   const searchParams = useSearchParams()
   const [cloudinaryGuideOpen, setCloudinaryGuideOpen] = useState(false)
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null)
 
   // Auto-open Cloudinary guide when redirected from project creation
   useEffect(() => {
@@ -322,76 +323,115 @@ export default function SettingsPage() {
       </div>
 
       <Dialog open={cloudinaryGuideOpen} onOpenChange={setCloudinaryGuideOpen}>
-        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto sm:max-w-5xl">
+        <DialogContent className="max-h-[95vh] !w-[95vw] sm:!w-[92vw] lg:!w-[85vw] xl:!w-[1200px] !max-w-none sm:!max-w-none overflow-y-auto p-4 sm:p-6">
           <DialogHeader className="space-y-3 text-left">
-            <DialogTitle>Hướng dẫn tạo tài khoản Cloudinary</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl">Hướng dẫn tạo tài khoản Cloudinary</DialogTitle>
+            <DialogDescription className="text-base">
               Làm theo 3 bước dưới đây tại{' '}
               <a
                 href="https://cloudinary.com/"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
+                className="inline-flex items-center gap-1 font-bold text-primary underline-offset-4 hover:underline"
               >
                 cloudinary.com
-                <ExternalLink className="h-3.5 w-3.5" />
+                <ExternalLink className="h-4 w-4" />
               </a>{' '}
               để tạo tài khoản bằng Google và lấy đủ API key cho studio.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-6 lg:grid-cols-3">
-            <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold">Bước 1: Đăng nhập bằng Google</p>
-                <p className="text-sm text-muted-foreground">
-                  Vào Cloudinary và chọn nút đăng nhập bằng Google để tạo tài khoản nhanh.
-                </p>
+            {[
+              {
+                step: 1,
+                title: 'Đăng nhập bằng Google',
+                desc: 'Vào Cloudinary và chọn nút đăng nhập bằng Google để tạo tài khoản nhanh.',
+                src: '/cloudinary_setup/b1.png',
+                alt: 'Cloudinary login bằng Google'
+              },
+              {
+                step: 2,
+                title: 'Mở View API Keys',
+                desc: 'Sau khi vào dashboard, chọn Next.js và sau đó nhấn vào nút View API Keys để xem thông tin cần điền vào hệ thống.',
+                src: '/cloudinary_setup/b2.png',
+                alt: 'Cloudinary hướng dẫn nhấn View API Keys'
+              },
+              {
+                step: 3,
+                title: 'Lấy Product Environment Credentials',
+                desc: 'Ở mục Product Environment Credentials, hãy nhấn vào biểu tượng con mắt để hiện API Secret trước khi copy sang hệ thống.',
+                src: '/cloudinary_setup/b3.png',
+                alt: 'Cloudinary Product Environment Credentials'
+              }
+            ].map((item) => (
+              <div key={item.step} className="space-y-4 rounded-xl border bg-muted/30 p-5 transition-colors hover:bg-muted/50">
+                <div className="space-y-1.5">
+                  <p className="text-base font-bold text-primary">Bước {item.step}: {item.title}</p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {item.desc}
+                  </p>
+                </div>
+                <div 
+                  className="group relative cursor-zoom-in overflow-hidden rounded-lg border bg-background transition-all hover:ring-2 hover:ring-primary/50"
+                  onClick={() => setZoomedImage(item.src)}
+                >
+                  <Image
+                    src={item.src}
+                    alt={item.alt}
+                    width={1200}
+                    height={900}
+                    className="h-auto w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/5">
+                    <span className="rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      Nhấn để phóng to
+                    </span>
+                  </div>
+                </div>
+                {item.step === 3 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-normal text-amber-900">
+                    <span className="font-bold">Lưu ý:</span> API Secret bị ẩn mặc định. Bạn cần nhấn biểu tượng hiện mật khẩu ở cạnh trường này thì mới sao chép được chính xác.
+                  </div>
+                )}
               </div>
-              <Image
-                src="/cloudinary_setup/b1.png"
-                alt="Cloudinary login bằng Google"
-                width={1200}
-                height={900}
-                className="h-auto w-full rounded-lg border object-contain"
-              />
-            </div>
-
-            <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold">Bước 2: Mở View API Keys</p>
-                <p className="text-sm text-muted-foreground">
-                  Sau khi vào dashboard, nhấn vào nút <span className="font-medium">View API Keys</span> để xem thông tin cần điền vào hệ thống.
-                </p>
-              </div>
-              <Image
-                src="/cloudinary_setup/b2.png"
-                alt="Cloudinary hướng dẫn nhấn View API Keys"
-                width={1200}
-                height={900}
-                className="h-auto w-full rounded-lg border object-contain"
-              />
-            </div>
-
-            <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold">Bước 3: Lấy Product Environment Credentials</p>
-                <p className="text-sm text-muted-foreground">
-                  Ở mục Product Environment Credentials, hãy nhấn vào biểu tượng con mắt để hiện API Secret trước khi copy sang hệ thống.
-                </p>
-              </div>
-              <Image
-                src="/cloudinary_setup/b3.png"
-                alt="Cloudinary Product Environment Credentials"
-                width={1200}
-                height={900}
-                className="h-auto w-full rounded-lg border object-contain"
-              />
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                Lưu ý: API Secret bị ẩn mặc định. Bạn cần nhấn biểu tượng hiện mật khẩu ở cạnh trường này thì mới sao chép được chính xác.
-              </div>
-            </div>
+            ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Zoom Dialog */}
+      <Dialog open={!!zoomedImage} onOpenChange={() => setZoomedImage(null)}>
+        <DialogContent 
+          className="max-h-[98vh] !w-[98vw] sm:!w-[95vw] !max-w-none sm:!max-w-none overflow-hidden border-none bg-transparent p-0 shadow-none"
+          showCloseButton={false}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Xem ảnh phóng to</DialogTitle>
+            <DialogDescription>Hình ảnh chi tiết bước hướng dẫn Cloudinary</DialogDescription>
+          </DialogHeader>
+          {zoomedImage && (
+            <div className="relative flex h-full w-full items-center justify-center">
+              <div className="relative overflow-hidden rounded-xl bg-background shadow-2xl">
+                <Image
+                  src={zoomedImage}
+                  alt="Zoomed view"
+                  width={2400}
+                  height={1800}
+                  className="max-h-[90vh] w-auto object-contain"
+                  priority
+                />
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="absolute right-4 top-4 h-10 w-10 rounded-full bg-black/50 text-white shadow-lg backdrop-blur-md hover:bg-black/70 hover:text-white"
+                  onClick={() => setZoomedImage(null)}
+                >
+                  <XIcon className="h-6 w-6" />
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

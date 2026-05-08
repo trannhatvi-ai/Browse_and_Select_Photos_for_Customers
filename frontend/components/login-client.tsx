@@ -282,8 +282,8 @@ export default function LoginClient() {
         <div className="hidden lg:flex flex-col h-full rounded-3xl bg-white overflow-hidden relative group border border-slate-200">
           {/* Showcase background with infinite scroll - Light Theme */}
           <div className="absolute inset-0 z-0">
-             <ShowcaseCarousel token="zehgnjymsk" />
-             <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent" />
+            <ShowcaseCarousel token="zehgnjymsk" />
+            <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent" />
           </div>
 
           <div className="relative z-10 mt-auto p-12 text-slate-900">
@@ -291,24 +291,24 @@ export default function LoginClient() {
               <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
               <span>Giao diện thực tế: zehgnjymsk</span>
             </div>
-            
+
             <h2 className="mb-6 text-5xl font-extrabold leading-[1.05] tracking-tight text-slate-900">
               Trải nghiệm <br />
               <span className="text-primary italic font-serif">chọn ảnh</span> đỉnh cao
             </h2>
-            
+
             <p className="mb-10 text-lg text-slate-500 max-w-sm leading-relaxed font-light">
               Tối ưu hóa quy trình làm việc của Studio. Mang đến cho khách hàng của bạn một không gian chọn ảnh sang trọng và hiện đại.
             </p>
 
             <div className="flex flex-col gap-6">
-              <Button 
+              <Button
                 onClick={() => window.open('/gallery/zehgnjymsk', '_blank')}
                 className="w-fit h-14 px-10 rounded-full bg-slate-900 text-white hover:bg-slate-800 font-bold gap-3 transition-all active:scale-95 shadow-xl group/btn"
               >
                 <Eye className="h-5 w-5 transition-transform group-hover/btn:scale-110" /> Khám phá Gallery Demo
               </Button>
-              
+
               <div className="grid grid-cols-2 gap-10 border-t border-slate-100 pt-10 mt-2">
                 <div className="space-y-1">
                   <div className="text-3xl font-black text-slate-900">10k+</div>
@@ -329,7 +329,7 @@ export default function LoginClient() {
 
 function ShowcaseCarousel({ token }: { token: string }) {
   const [photos, setPhotos] = useState<any[]>([])
-  
+
   useEffect(() => {
     fetch(`/api/gallery/${token}`)
       .then(res => res.ok ? res.json() : null)
@@ -360,7 +360,7 @@ function ShowcaseCarousel({ token }: { token: string }) {
           animation: scroll-y 75s linear infinite reverse;
         }
       `}</style>
-      
+
       <div className="flex-1 flex flex-col gap-4 animate-scroll-y">
         {col1.map((p, i) => (
           <div key={`${p.id}-${i}`} className="relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded-3xl shadow-sm border border-slate-100">
@@ -368,7 +368,7 @@ function ShowcaseCarousel({ token }: { token: string }) {
           </div>
         ))}
       </div>
-      
+
       <div className="flex-1 flex flex-col gap-4 animate-scroll-y-reverse">
         {col2.map((p, i) => (
           <div key={`${p.id}-${i}`} className="relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded-3xl shadow-sm border border-slate-100">
