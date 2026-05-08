@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, Copy, ImageIcon, Loader2, Plus, Save, Settings2, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Copy, ImageIcon, Loader2, Plus, RefreshCw, Save, Settings2, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
