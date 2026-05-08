@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Progress } from '@/components/ui/progress'
 import {
   Dialog,
   DialogContent,
@@ -35,14 +36,6 @@ export default function SettingsPage() {
   const searchParams = useSearchParams()
   const [cloudinaryGuideOpen, setCloudinaryGuideOpen] = useState(false)
   const [zoomedImage, setZoomedImage] = useState<string | null>(null)
-
-  // Auto-open Cloudinary guide when redirected from project creation
-  useEffect(() => {
-    if (searchParams.get('setup') === 'cloudinary') {
-      setCloudinaryGuideOpen(true)
-      toast.warning('Bạn cần cấu hình Cloudinary trước khi tạo show chụp. Hãy làm theo hướng dẫn bên dưới.')
-    }
-  }, [searchParams])
   const [studioName, setStudioName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -51,6 +44,37 @@ export default function SettingsPage() {
   const [cloudinaryApiSecret, setCloudinaryApiSecret] = useState('')
   const [allowSharedCloudinary, setAllowSharedCloudinary] = useState(true)
   const [userRole, setUserRole] = useState('')
+  const [globalStats, setGlobalStats] = useState<any>(null)
+  const [loadingStats, setLoadingStats] = useState(false)
+
+  const fetchGlobalStats = async () => {
+    setLoadingStats(true)
+    try {
+      const res = await fetch('/api/ai-stats/admin/stats/global')
+      if (res.ok) {
+        const data = await res.json()
+        setGlobalStats(data)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoadingStats(false)
+    }
+  }
+
+  // Auto-open Cloudinary guide when redirected from project creation
+  useEffect(() => {
+    if (userRole === 'ADMIN') {
+      void fetchGlobalStats()
+    }
+  }, [userRole])
+
+  useEffect(() => {
+    if (searchParams.get('setup') === 'cloudinary') {
+      setCloudinaryGuideOpen(true)
+      toast.warning('Bạn cần cấu hình Cloudinary trước khi tạo show chụp. Hãy làm theo hướng dẫn bên dưới.')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     fetch('/api/settings')
@@ -146,54 +170,71 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2 mb-4">
+                   <div className="rounded-xl border bg-blue-50/50 p-4 space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="font-medium text-blue-700">Database Context</span>
+                        <span className="font-bold">{globalStats?.context_photos_db ?? 0} / {globalStats?.total_photos ?? 0}</span>
+                      </div>
+                      <Progress value={globalStats?.percentage_db ?? 0} className="h-2 bg-blue-100" />
+                      <p className="text-[10px] text-blue-600 italic">Tổng ảnh đã có mô tả AI lưu trong Postgres</p>
+                   </div>
+                   
+                   <div className="rounded-xl border bg-emerald-50/50 p-4 space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="font-medium text-emerald-700">Redis Indexing</span>
+                        <span className="font-bold">{globalStats?.indexed_photos_redis ?? 0} / {globalStats?.total_photos ?? 0}</span>
+                      </div>
+                      <Progress value={globalStats?.percentage_redis ?? 0} className="h-2 bg-emerald-100" />
+                      <p className="text-[10px] text-emerald-600 italic">Tổng ảnh đã sẵn sàng để tìm kiếm (Vector)</p>
+                   </div>
+                </div>
+
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full mb-6 border-dashed"
+                  onClick={fetchGlobalStats}
+                  disabled={loadingStats}
+                >
+                  {loadingStats ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <FlaskConical className="h-3 w-3 mr-2" />}
+                  Lấy số liệu hệ thống mới nhất
+                </Button>
+
                 <div className="space-y-3 rounded-lg border border-amber-200 bg-background p-4">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Đồng bộ hoàn toàn (Rebuild tất cả)</p>
                     <p className="text-xs text-muted-foreground">
-                      Gửi lại tất cả ảnh cho Gemini, kể cả những ảnh đã có ngữ cảnh. Dùng khi thay đổi Model AI hoặc muốn cập nhật lại toàn bộ.
+                      Xóa toàn bộ Vector cũ trong Redis và nhúng lại từ đầu bằng Gemini. Dùng khi muốn cập nhật toàn diện dữ liệu AI.
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="border-amber-200 hover:bg-amber-100 text-amber-700 w-full sm:w-auto"
-                    onClick={async () => {
-                      if (!confirm('Bạn có chắc chắn muốn đồng bộ hoàn toàn? Tất cả ảnh sẽ được gửi cho Gemini lại. Việc này có thể mất vài phút tùy lượng ảnh.')) return
-
+                  <Button 
+                    className="bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto"
+                    onClick={() => {
                       setSyncingFull(true)
-                      toast.promise(
-                        fetch('/api/admin/sync-ai?fullRebuild=true', { method: 'POST' }).then(async res => {
-                          if (!res.ok) {
-                            let message = 'Không thể khởi động tiến trình đồng bộ.'
-                            try {
-                              const payload = await res.json()
-                              message = payload?.error || payload?.detail || message
-                            } catch {
-                              // Keep fallback message when response is not JSON.
-                            }
-                            throw new SyncAIError(message, res.status)
-                          }
-                          return res.json()
-                        }),
-                        {
-                          loading: 'Đang bắt đầu tiến trình đồng bộ hoàn toàn...',
-                          success: (data) => `Đã bắt đầu đồng bộ hoàn toàn cho ${data.queued_count} show!`,
-                          error: (error) => {
-                            if (error instanceof SyncAIError) {
-                              if (error.status) {
-                                return `Lỗi ${error.status}: ${error.message}`
-                              }
-                              return error.message
-                            }
-                            if (error instanceof Error) return error.message
-                            return 'Không thể khởi động tiến trình đồng bộ.'
-                          }
+                      const promise = fetch('/api/ai-stats/sync/all', { method: 'POST' }).then(async res => {
+                        if (!res.ok) {
+                          let message = 'Lỗi đồng bộ'
+                          try {
+                            const data = await res.json()
+                            message = data.error || data.detail || message
+                          } catch {}
+                          throw new Error(message)
                         }
-                      ).finally(() => setSyncingFull(false))
+                        return res.json()
+                      })
+
+                      toast.promise(promise, {
+                        loading: 'Đang bắt đầu đồng bộ toàn bộ...',
+                        success: (data: any) => `Đã bắt đầu cho ${data.queued_count} show chụp!`,
+                        error: (err) => err.message
+                      })
+                      promise.finally(() => setSyncingFull(false))
                     }}
                     disabled={syncingFull || syncingIncremental}
                   >
                     {syncingFull ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Đồng bộ hoàn toàn
+                    Bắt đầu ngay
                   </Button>
                 </div>
 
@@ -201,45 +242,32 @@ export default function SettingsPage() {
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Ưu tiên embed (Chỉ nhúng ảnh mới)</p>
                     <p className="text-xs text-muted-foreground">
-                      Bỏ qua những ảnh đã có ngữ cảnh từ Gemini, chỉ gửi những ảnh chưa có. Dùng khi cần cập nhật nhanh cho các ảnh mới được thêm vào.
+                      Chỉ gửi những ảnh chưa có ngữ cảnh tới Gemini. Tiết kiệm chi phí và thời gian.
                     </p>
                   </div>
                   <Button
                     variant="outline"
                     className="border-blue-200 hover:bg-blue-100 text-blue-700 w-full sm:w-auto"
-                    onClick={async () => {
-                      if (!confirm('Bạn có chắc chắn muốn ưu tiên embed? Chỉ những ảnh chưa có ngữ cảnh từ Gemini sẽ được xử lý. Tiến trình này sẽ nhanh hơn.')) return
-
+                    onClick={() => {
                       setSyncingIncremental(true)
-                      toast.promise(
-                        fetch('/api/admin/sync-ai?fullRebuild=false', { method: 'POST' }).then(async res => {
-                          if (!res.ok) {
-                            let message = 'Không thể khởi động tiến trình đồng bộ.'
-                            try {
-                              const payload = await res.json()
-                              message = payload?.error || payload?.detail || message
-                            } catch {
-                              // Keep fallback message when response is not JSON.
-                            }
-                            throw new SyncAIError(message, res.status)
-                          }
-                          return res.json()
-                        }),
-                        {
-                          loading: 'Đang bắt đầu tiến trình ưu tiên embed...',
-                          success: (data) => `Đã bắt đầu ưu tiên embed cho ${data.queued_count} show!`,
-                          error: (error) => {
-                            if (error instanceof SyncAIError) {
-                              if (error.status) {
-                                return `Lỗi ${error.status}: ${error.message}`
-                              }
-                              return error.message
-                            }
-                            if (error instanceof Error) return error.message
-                            return 'Không thể khởi động tiến trình đồng bộ.'
-                          }
+                      const promise = fetch('/api/ai-stats/sync/incremental', { method: 'POST' }).then(async res => {
+                        if (!res.ok) {
+                          let message = 'Lỗi đồng bộ'
+                          try {
+                            const data = await res.json()
+                            message = data.error || data.detail || message
+                          } catch {}
+                          throw new Error(message)
                         }
-                      ).finally(() => setSyncingIncremental(false))
+                        return res.json()
+                      })
+
+                      toast.promise(promise, {
+                        loading: 'Đang chuẩn bị đồng bộ bổ sung...',
+                        success: (data: any) => `Đã bắt đầu xử lý cho ${data.queued_count} show chụp!`,
+                        error: (err) => err.message
+                      })
+                      promise.finally(() => setSyncingIncremental(false))
                     }}
                     disabled={syncingFull || syncingIncremental}
                   >

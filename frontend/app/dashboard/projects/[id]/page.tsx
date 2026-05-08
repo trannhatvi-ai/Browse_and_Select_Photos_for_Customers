@@ -87,6 +87,31 @@ export default function ProjectDetailPage() {
   const [deletingPhoto, setDeletingPhoto] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<Array<{ id: string; name: string; progress: number; status: string }>>([])
   const [isUploading, setIsUploading] = useState(false)
+  const [aiStats, setAiStats] = useState<{
+    total_photos: number
+    context_photos_db: number
+    indexed_photos_redis: number
+    percentage_db: number
+    percentage_redis: number
+  } | null>(null)
+  const [loadingStats, setLoadingStats] = useState(false)
+  const [syncingAi, setSyncingAi] = useState(false)
+
+  const fetchAiStats = async () => {
+    if (!projectId) return
+    setLoadingStats(true)
+    try {
+      const res = await fetch(`/api/ai-stats/projects/${projectId}/stats`)
+      if (res.ok) {
+        const data = await res.json()
+        setAiStats(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch AI stats', error)
+    } finally {
+      setLoadingStats(false)
+    }
+  }
 
   const fetchDetails = async () => {
     if (!projectId) return
@@ -105,6 +130,9 @@ export default function ProjectDetailPage() {
       setClientNameDraft(data.clientName ?? '')
       setClientEmailDraft(data.clientEmail ?? '')
       setStatusDraft(data.status ?? 'CHOOSING')
+      
+      // Lấy luôn stats khi load details
+      void fetchAiStats()
     } catch (error) {
       toast.error((error as Error).message)
     } finally {
@@ -385,7 +413,7 @@ export default function ProjectDetailPage() {
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity" />
 
                     {photo.selected && (
                       <div className="absolute right-2 top-2 z-10">
@@ -395,7 +423,7 @@ export default function ProjectDetailPage() {
                       </div>
                     )}
 
-                    <div className="absolute inset-0 flex flex-col justify-end p-2 sm:p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute inset-0 flex flex-col justify-end p-2 sm:p-3 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                       <div className="flex items-center justify-between gap-2">
 
                         <div className="flex gap-1.5">
@@ -450,6 +478,85 @@ export default function ProjectDetailPage() {
 
         <aside className="hidden lg:block">
           <div className="sticky top-24 space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-1 px-1">
+                <h2 className="text-lg font-bold tracking-tight">Trạng thái AI</h2>
+                <p className="text-xs text-muted-foreground">Kiểm tra mức độ đồng bộ ngữ cảnh.</p>
+              </div>
+
+              <Card className="rounded-3xl border bg-primary/5 p-4 shadow-none">
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                         <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                         Ngữ cảnh (Database)
+                      </span>
+                      <span className="font-bold">{aiStats?.context_photos_db ?? 0}/{aiStats?.total_photos ?? 0}</span>
+                    </div>
+                    <Progress value={aiStats?.percentage_db ?? 0} className="h-1.5 bg-blue-100" />
+                    <div className="flex justify-between text-[10px] text-muted-foreground italic">
+                      <span>Đã lưu mô tả Gemini</span>
+                      <span>{aiStats?.percentage_db ?? 0}%</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                         Tìm kiếm (Redis)
+                      </span>
+                      <span className="font-bold">{aiStats?.indexed_photos_redis ?? 0}/{aiStats?.total_photos ?? 0}</span>
+                    </div>
+                    <Progress value={aiStats?.percentage_redis ?? 0} className="h-1.5 bg-emerald-100" />
+                    <div className="flex justify-between text-[10px] text-muted-foreground italic">
+                      <span>Sẵn sàng tìm kiếm</span>
+                      <span>{aiStats?.percentage_redis ?? 0}%</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-9 text-xs rounded-xl bg-background hover:bg-muted"
+                      onClick={fetchAiStats}
+                      disabled={loadingStats || syncingAi}
+                    >
+                      {loadingStats ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+                      Kiểm tra lại
+                    </Button>
+                    
+                    <Button 
+                      className="w-full h-9 text-xs rounded-xl bg-amber-500 hover:bg-amber-600 text-white"
+                      onClick={async () => {
+                        setSyncingAi(true)
+                        try {
+                          const res = await fetch(`/api/ai-stats/projects/${project.id}/sync`, { method: 'POST' })
+                          if (res.ok) {
+                            const data = await res.json()
+                            toast.success(`Đã bắt đầu tạo ngữ cảnh cho ${data.queued_count} ảnh!`)
+                            // Tự động tải lại stats sau khi bắt đầu
+                            setTimeout(fetchAiStats, 2000)
+                          } else {
+                            toast.error('Không thể bắt đầu tạo ngữ cảnh')
+                          }
+                        } catch (err) {
+                          toast.error('Lỗi kết nối')
+                        } finally {
+                          setSyncingAi(false)
+                        }
+                      }}
+                      disabled={loadingStats || syncingAi}
+                    >
+                      {syncingAi ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Sparkles className="h-3 w-3 mr-2" />}
+                      Tạo ngữ cảnh AI
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
             <div className="space-y-1 px-1">
               <h2 className="text-lg font-bold tracking-tight">Cấu hình</h2>
               <p className="text-xs text-muted-foreground">Thiết lập các thông số cho show chụp.</p>
@@ -568,7 +675,47 @@ export default function ProjectDetailPage() {
               </SheetDescription>
             </SheetHeader>
 
-            <div className="rounded-2xl border bg-muted/30 p-4 space-y-6">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    Trạng thái đồng bộ AI
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground">Kiểm tra dữ liệu ngữ cảnh trong hệ thống.</p>
+                </div>
+                
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 rounded-xl border bg-blue-50/30 p-3">
+                    <div className="flex justify-between text-[11px] font-medium">
+                      <span>Database</span>
+                      <span>{aiStats?.context_photos_db ?? 0}/{aiStats?.total_photos ?? 0}</span>
+                    </div>
+                    <Progress value={aiStats?.percentage_db ?? 0} className="h-1 bg-blue-200" />
+                  </div>
+                  
+                  <div className="space-y-2 rounded-xl border bg-emerald-50/30 p-3">
+                    <div className="flex justify-between text-[11px] font-medium">
+                      <span>Redis</span>
+                      <span>{aiStats?.indexed_photos_redis ?? 0}/{aiStats?.total_photos ?? 0}</span>
+                    </div>
+                    <Progress value={aiStats?.percentage_redis ?? 0} className="h-1 bg-emerald-200" />
+                  </div>
+                </div>
+
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full h-9 text-xs rounded-xl"
+                  onClick={fetchAiStats}
+                  disabled={loadingStats}
+                >
+                  {loadingStats ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Sparkles className="h-3 w-3 mr-2 text-amber-500" />}
+                  Cập nhật trạng thái mới nhất
+                </Button>
+              </div>
+
+              <div className="rounded-2xl border bg-muted/30 p-4 space-y-6">
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="event-name" className="text-xs text-muted-foreground">Tên sự kiện</Label>
@@ -649,7 +796,8 @@ export default function ProjectDetailPage() {
               </Button>
             </div>
           </div>
-        </SheetContent>
+        </div>
+      </SheetContent>
       </Sheet>
 
       <StudioLightbox

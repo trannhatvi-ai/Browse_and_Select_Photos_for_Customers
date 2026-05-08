@@ -98,26 +98,8 @@ export async function POST(
   // Không cập nhật photoCount vì field không tồn tại trong schema
 
   if (uploadedPhotos.length > 0) {
-    try {
-      const indexPayload = {
-        project_id: projectId,
-        urls: uploadedPhotos.map((photo: any) => photo.previewUrl),
-        rebuild: false,
-        project_created_at: project.createdAt.toISOString(),
-        project_expires_at: project.deadline.toISOString(),
-      }
-
-      // Chỉ gọi index để AI bắt đầu xử lý, không đợi kết quả
-      fetch(buildBackendUrl('/index'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(indexPayload),
-        cache: 'no-store',
-      }).catch(err => console.error('Failed to trigger background indexing:', err))
-      
-    } catch (error) {
-      console.error('Failed to start indexing after upload:', error)
-    }
+    // Không tự động gọi AI nữa, người dùng sẽ nhấn nút thủ công ở Frontend
+    console.log(`Uploaded ${uploadedPhotos.length} photos for project ${projectId}. Waiting for manual AI trigger.`)
   }
 
   return NextResponse.json({ 
