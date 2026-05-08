@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Check, CheckCircle2, ChevronDown, Copy, ImageIcon, LayoutGrid, Loader2, Maximize2, Plus, RefreshCw, Save, Settings2, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, Check, CheckCircle2, ChevronDown, Copy, ImageIcon, LayoutGrid, Loader2, Maximize2, MousePointer2, Plus, RefreshCw, Save, Settings2, Sparkles, Square, CheckSquare, Trash2, Upload, X } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -107,6 +107,9 @@ export default function ProjectDetailPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest')
   const [syncingPhotos, setSyncingPhotos] = useState<Set<string>>(new Set())
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
   const aiSyncCompleted = Boolean(
     aiStats &&
@@ -194,6 +197,39 @@ export default function ProjectDetailPage() {
     })),
     [photos]
   )
+
+  const handleBulkDelete = async () => {
+    if (!project || selectedIds.size === 0) return
+
+    setIsBulkDeleting(true)
+    try {
+      const res = await fetch(`/api/projects/${project.id}/photos`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoIds: Array.from(selectedIds) }),
+      })
+
+      if (!res.ok) throw new Error('Xóa hàng loạt thất bại!')
+
+      toast.success(`Đã xóa ${selectedIds.size} ảnh!`)
+      setSelectedIds(new Set())
+      setIsSelectionMode(false)
+      await fetchDetails()
+    } catch (error) {
+      toast.error((error as Error).message || 'Lỗi kết nối!')
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
+  const togglePhotoSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const handleDeletePhoto = async () => {
     if (!project || !deletePhotoTarget) return
@@ -439,6 +475,24 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-9 gap-2 sm:h-10 transition-all duration-300 rounded-xl",
+                isSelectionMode 
+                  ? "bg-primary/10 border-primary/30 text-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]" 
+                  : "hover:bg-accent/50"
+              )}
+              onClick={() => {
+                setIsSelectionMode(!isSelectionMode)
+                setSelectedIds(new Set())
+              }}
+            >
+              <MousePointer2 className={cn("h-4 w-4 transition-transform", isSelectionMode && "scale-110")} />
+              <span className="hidden sm:inline font-medium">{isSelectionMode ? 'Đang chọn...' : 'Chọn nhiều'}</span>
+            </Button>
+
             <Button variant="outline" size="sm" className="h-9 gap-2 sm:h-10" onClick={() => document.getElementById('quick-upload')?.click()}>
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Thêm ảnh</span>
@@ -469,52 +523,80 @@ export default function ProjectDetailPage() {
                 key={photo.id}
                 className={cn(
                   'group relative aspect-[3/4] cursor-pointer overflow-hidden rounded-2xl bg-muted transition-all duration-300 hover:shadow-xl',
-                  isSelected && 'ring-2 ring-primary ring-offset-2'
+                  (isSelected && !isSelectionMode) && 'ring-2 ring-primary ring-offset-2',
+                  (isSelectionMode && selectedIds.has(photo.id)) && 'ring-4 ring-primary ring-offset-2 shadow-2xl'
                 )}
                 onClick={() => {
-                  setLightboxIndex(index)
-                  setLightboxOpen(true)
+                  if (isSelectionMode) {
+                    togglePhotoSelection(photo.id)
+                  } else {
+                    setLightboxIndex(index)
+                    setLightboxOpen(true)
+                  }
                 }}
               >
                 <img
                   src={photo.previewUrl || photo.url}
                   alt={photo.filename}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  className={cn(
+                    "h-full w-full object-cover transition-transform duration-500",
+                    !isSelectionMode && "group-hover:scale-110",
+                    isSelectionMode && selectedIds.has(photo.id) && "opacity-75 scale-95"
+                  )}
                   loading="lazy"
                 />
                 
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                  <div className="absolute right-2 top-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        openAiSheet(photo)
-                      }}
-                      className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-amber-400 backdrop-blur-md transition-all hover:bg-black/60 shadow-lg"
-                      title="AI Insight"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                    </button>
+                {isSelectionMode && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 backdrop-blur-[2px] transition-all">
+                    <div className={cn(
+                      "flex h-12 w-12 items-center justify-center rounded-2xl border-2 transition-all duration-300 shadow-2xl",
+                      selectedIds.has(photo.id) 
+                        ? "bg-primary border-primary text-primary-foreground scale-110 rotate-0 shadow-primary/40" 
+                        : "bg-white/10 border-white/40 text-white/50 scale-90 -rotate-6 backdrop-blur-md"
+                    )}>
+                      {selectedIds.has(photo.id) ? (
+                        <CheckSquare className="h-7 w-7" />
+                      ) : (
+                        <Square className="h-7 w-7 opacity-20" />
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="absolute inset-x-0 bottom-0 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-[10px] font-medium text-white/90">{photo.filename}</p>
+                )}
+
+                {!isSelectionMode && (
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                    <div className="absolute right-2 top-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          setDeletePhotoTarget(photo)
+                          openAiSheet(photo)
                         }}
-                        className="text-white/60 hover:text-red-400 transition-colors"
-                        title="Xóa ảnh"
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-amber-400 backdrop-blur-md transition-all hover:bg-black/60 shadow-lg"
+                        title="AI Insight"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Sparkles className="h-4 w-4" />
                       </button>
                     </div>
+                    
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-[10px] font-medium text-white/90">{photo.filename}</p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeletePhotoTarget(photo)
+                          }}
+                          className="text-white/60 hover:text-red-400 transition-colors"
+                          title="Xóa ảnh"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {photo.selected && (
+                {(photo.selected && !isSelectionMode) && (
                   <div className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white shadow-lg ring-2 ring-white">
                     <Check className="h-3.5 w-3.5 stroke-[3]" />
                   </div>
@@ -668,6 +750,52 @@ export default function ProjectDetailPage() {
             </div>
         </SheetContent>
       </Sheet>
+
+      {/* Bulk Actions Bar */}
+      {isSelectionMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 z-[200] -translate-x-1/2 px-4 w-full max-w-lg animate-in fade-in slide-in-from-bottom-6 duration-500 cubic-bezier(0.16, 1, 0.3, 1)">
+          <div className="flex items-center justify-between gap-4 rounded-3xl bg-black/80 p-2 pl-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl ring-1 ring-white/10">
+            <div className="flex items-center gap-4">
+              <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                <span className="text-lg font-black">{selectedIds.size}</span>
+                <div className="absolute -right-1 -top-1 h-3 w-3 animate-ping rounded-full bg-white/40" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-white tracking-tight">Đã chọn {selectedIds.size} ảnh</span>
+                <span className="text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Sẵn sàng để thực hiện</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setIsSelectionMode(false)
+                  setSelectedIds(new Set())
+                }}
+                className="h-12 rounded-2xl hover:bg-white/5 text-white/60 hover:text-white transition-all font-medium px-4"
+              >
+                Hủy
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                disabled={isBulkDeleting}
+                onClick={handleBulkDelete}
+                className="h-12 gap-2 rounded-2xl px-6 font-bold shadow-xl transition-all active:scale-95 bg-red-500 hover:bg-red-600 border-none"
+              >
+                {isBulkDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-5 w-5" />
+                )}
+                <span>Xóa hàng loạt</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <StudioLightbox
         photos={formattedPhotos}

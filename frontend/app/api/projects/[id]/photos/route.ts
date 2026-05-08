@@ -109,14 +109,22 @@ export async function POST(
   })
 }
 
-// DELETE /api/projects/[id]/photos — xóa ảnh từ Cloudinary + DB
+// DELETE /api/projects/[id]/photos — xóa ảnh từ Cloudinary + DB (hỗ trợ xóa hàng loạt)
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { photoId } = await req.json()
+  const body = await req.json()
+  const { photoId, photoIds } = body
   const { id: projectId } = await params
   
+  // Chấp nhận cả 1 id lẻ hoặc 1 mảng id
+  const idsToDelete = photoIds || (photoId ? [photoId] : [])
+  
+  if (!idsToDelete || idsToDelete.length === 0) {
+    return NextResponse.json({ error: 'Missing photoId or photoIds' }, { status: 400 })
+  }
+
   // Lấy thông tin show chụp để kiểm tra owner
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -130,42 +138,55 @@ export async function DELETE(
   const credentials = await getCloudinaryCredentialsForProject(projectId)
   cloudinary.config(credentials)
   
-  if (!photoId) {
-    return NextResponse.json({ error: 'Missing photoId' }, { status: 400 })
-  }
-
   try {
-    // Lấy thông tin ảnh trước khi xóa
-    const photo = await prisma.photo.findUnique({ where: { id: photoId } })
-    if (!photo) {
-      return NextResponse.json({ error: 'Photo not found' }, { status: 404 })
-    }
+    const results = []
+    const cancelledUrls = []
 
-    // Xóa trên Cloudinary (originalUrl chứa public_id)
-    try {
-      await cloudinary.uploader.destroy(photo.originalUrl)
-    } catch (err) {
-      console.error('Cloudinary delete error:', err)
-    }
+    for (const id of idsToDelete) {
+      try {
+        // Lấy thông tin ảnh trước khi xóa
+        const photo = await prisma.photo.findUnique({ where: { id } })
+        if (!photo) continue
 
-    // Xóa trong Database
-    await prisma.photo.delete({ where: { id: photoId } })
+        // Xóa trên Cloudinary (originalUrl chứa public_id)
+        try {
+          await cloudinary.uploader.destroy(photo.originalUrl)
+        } catch (err) {
+          console.error(`Cloudinary delete error for ${id}:`, err)
+        }
+
+        // Xóa trong Database
+        await prisma.photo.delete({ where: { id } })
+        
+        cancelledUrls.push(photo.previewUrl)
+        results.push({ id, success: true })
+      } catch (err) {
+        console.error(`Error deleting photo ${id}:`, err)
+        results.push({ id, success: false, error: (err as Error).message })
+      }
+    }
 
     // Thông báo cho Python backend để dừng xử lý AI nếu đang chạy
-    try {
-      fetch(buildBackendUrl('/cancel'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          project_id: projectId,
-          urls: [photo.previewUrl]
-        }),
-      }).catch(err => console.error('Failed to notify cancel to backend:', err))
-    } catch (error) {
-      console.error('Error triggering cancellation:', error)
+    if (cancelledUrls.length > 0) {
+      try {
+        fetch(buildBackendUrl('/cancel'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_id: projectId,
+            urls: cancelledUrls
+          }),
+        }).catch(err => console.error('Failed to notify cancel to backend:', err))
+      } catch (error) {
+        console.error('Error triggering cancellation:', error)
+      }
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true, 
+      count: results.filter(r => r.success).length,
+      details: results 
+    })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
