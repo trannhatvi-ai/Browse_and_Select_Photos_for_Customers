@@ -14,6 +14,13 @@ export async function POST(
   return handleRequest(request, await params, 'POST')
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return handleRequest(request, await params, 'DELETE')
+}
+
 async function handleRequest(
   request: NextRequest,
   params: { path: string[] },
