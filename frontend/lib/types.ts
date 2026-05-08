@@ -5,6 +5,7 @@ export interface Photo {
   date: string
   selected: boolean
   comment?: string
+  aiContext?: Record<string, unknown> | null
   // Optional AI metadata
   aiGroupId?: string
   aiBestShot?: boolean

@@ -11,9 +11,12 @@ import {
   LogOut,
   Camera,
   Shield,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { signOut } from 'next-auth/react'
+import { useSidebar } from '@/components/sidebar-context'
 
 const baseNavItems = [
   { href: '/dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard, roles: ['ADMIN', 'STUDIO'] },
@@ -25,18 +28,27 @@ const baseNavItems = [
 
 export function DashboardSidebar({ userRole = 'STUDIO', userName, userEmail }: { userRole?: string, userName?: string | null, userEmail?: string | null }) {
   const pathname = usePathname()
+  const { isSidebarOpen, toggleSidebar } = useSidebar()
 
   const navItems = baseNavItems.filter(item => item.roles.includes(userRole))
 
   return (
-    <aside className="hidden md:flex fixed inset-y-0 left-0 z-50 w-64 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-        <Camera className="h-6 w-6" />
-        <span className="text-lg font-semibold">Studio Pro</span>
+    <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
+      <div className={cn(
+        "flex h-16 items-center border-none px-6",
+        isSidebarOpen ? "justify-start" : "justify-center px-0"
+      )}>
+        {isSidebarOpen && (
+          <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap transition-all duration-300">
+            <Camera className="h-6 w-6" />
+            <span className="text-lg font-semibold">Studio Pro</span>
+          </div>
+        )}
+        {!isSidebarOpen && <Camera className="h-6 w-6" />}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1 p-4 overflow-hidden">
         {navItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`))
           return (
@@ -44,31 +56,39 @@ export function DashboardSidebar({ userRole = 'STUDIO', userName, userEmail }: {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors whitespace-nowrap',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                !isSidebarOpen && "justify-center px-0"
               )}
+              title={!isSidebarOpen ? item.label : undefined}
             >
-              <item.icon className="h-5 w-5" />
-              {item.label}
+              <item.icon className="h-5 w-5 shrink-0" />
+              {isSidebarOpen && <span className="transition-all duration-300">{item.label}</span>}
             </Link>
           )
         })}
       </nav>
 
       {/* User info + Logout */}
-      <div className="border-t border-sidebar-border p-4 space-y-2">
-        <div className="px-3 py-1.5">
-          <p className="text-xs font-medium truncate">{userName || userEmail || 'Người dùng'}</p>
-          <p className="text-[10px] text-sidebar-foreground/50">{userRole === 'ADMIN' ? 'Quản trị viên' : 'Chủ Studio'}</p>
-        </div>
+      <div className="border-none p-4 space-y-2 overflow-hidden">
+        {isSidebarOpen && (
+          <div className="px-3 py-1.5 whitespace-nowrap overflow-hidden">
+            <p className="text-xs font-medium truncate">{userName || userEmail || 'Người dùng'}</p>
+            <p className="text-[10px] text-sidebar-foreground/50">{userRole === 'ADMIN' ? 'Quản trị viên' : 'Chủ Studio'}</p>
+          </div>
+        )}
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+          className={cn(
+            "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground whitespace-nowrap",
+            !isSidebarOpen && "justify-center px-0"
+          )}
+          title="Đăng xuất"
         >
-          <LogOut className="h-5 w-5" />
-          Đăng xuất
+          <LogOut className="h-5 w-5 shrink-0" />
+          {isSidebarOpen && <span>Đăng xuất</span>}
         </button>
       </div>
     </aside>

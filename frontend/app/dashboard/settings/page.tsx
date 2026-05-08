@@ -30,6 +30,8 @@ class SyncAIError extends Error {
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [syncingFull, setSyncingFull] = useState(false)
+  const [syncingIncremental, setSyncingIncremental] = useState(false)
   const searchParams = useSearchParams()
   const [cloudinaryGuideOpen, setCloudinaryGuideOpen] = useState(false)
 
@@ -143,21 +145,22 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-amber-200 bg-background p-4">
+                <div className="space-y-3 rounded-lg border border-amber-200 bg-background p-4">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Đồng bộ hóa toàn bộ Vector (768 dims)</p>
+                    <p className="text-sm font-medium">Đồng bộ hoàn toàn (Rebuild tất cả)</p>
                     <p className="text-xs text-muted-foreground">
-                      Dùng khi bạn thay đổi Model AI. Tiến trình chạy tuần tự trong background để không làm sập server.
+                      Gửi lại tất cả ảnh cho Gemini, kể cả những ảnh đã có ngữ cảnh. Dùng khi thay đổi Model AI hoặc muốn cập nhật lại toàn bộ.
                     </p>
                   </div>
                   <Button
                     variant="outline"
-                    className="border-amber-200 hover:bg-amber-100 text-amber-700"
+                    className="border-amber-200 hover:bg-amber-100 text-amber-700 w-full sm:w-auto"
                     onClick={async () => {
-                      if (!confirm('Bạn có chắc chắn muốn đồng bộ lại toàn bộ AI? Việc này có thể mất vài phút tùy lượng ảnh.')) return
+                      if (!confirm('Bạn có chắc chắn muốn đồng bộ hoàn toàn? Tất cả ảnh sẽ được gửi cho Gemini lại. Việc này có thể mất vài phút tùy lượng ảnh.')) return
                       
+                      setSyncingFull(true)
                       toast.promise(
-                        fetch('/api/admin/sync-ai', { method: 'POST' }).then(async res => {
+                        fetch('/api/admin/sync-ai?fullRebuild=true', { method: 'POST' }).then(async res => {
                           if (!res.ok) {
                             let message = 'Không thể khởi động tiến trình đồng bộ.'
                             try {
@@ -171,8 +174,8 @@ export default function SettingsPage() {
                           return res.json()
                         }),
                         {
-                          loading: 'Đang bắt đầu tiến trình đồng bộ ngầm...',
-                          success: (data) => `Đã bắt đầu đồng bộ ${data.queued_count} dự án!`,
+                          loading: 'Đang bắt đầu tiến trình đồng bộ hoàn toàn...',
+                          success: (data) => `Đã bắt đầu đồng bộ hoàn toàn cho ${data.queued_count} dự án!`,
                           error: (error) => {
                             if (error instanceof SyncAIError) {
                               if (error.status) {
@@ -184,10 +187,63 @@ export default function SettingsPage() {
                             return 'Không thể khởi động tiến trình đồng bộ.'
                           }
                         }
-                      )
+                      ).finally(() => setSyncingFull(false))
                     }}
+                    disabled={syncingFull || syncingIncremental}
                   >
-                    Bắt đầu đồng bộ
+                    {syncingFull ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Đồng bộ hoàn toàn
+                  </Button>
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-blue-200 bg-background p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Ưu tiên embed (Chỉ nhúng ảnh mới)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Bỏ qua những ảnh đã có ngữ cảnh từ Gemini, chỉ gửi những ảnh chưa có. Dùng khi cần cập nhật nhanh cho các ảnh mới được thêm vào.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="border-blue-200 hover:bg-blue-100 text-blue-700 w-full sm:w-auto"
+                    onClick={async () => {
+                      if (!confirm('Bạn có chắc chắn muốn ưu tiên embed? Chỉ những ảnh chưa có ngữ cảnh từ Gemini sẽ được xử lý. Tiến trình này sẽ nhanh hơn.')) return
+                      
+                      setSyncingIncremental(true)
+                      toast.promise(
+                        fetch('/api/admin/sync-ai?fullRebuild=false', { method: 'POST' }).then(async res => {
+                          if (!res.ok) {
+                            let message = 'Không thể khởi động tiến trình đồng bộ.'
+                            try {
+                              const payload = await res.json()
+                              message = payload?.error || payload?.detail || message
+                            } catch {
+                              // Keep fallback message when response is not JSON.
+                            }
+                            throw new SyncAIError(message, res.status)
+                          }
+                          return res.json()
+                        }),
+                        {
+                          loading: 'Đang bắt đầu tiến trình ưu tiên embed...',
+                          success: (data) => `Đã bắt đầu ưu tiên embed cho ${data.queued_count} dự án!`,
+                          error: (error) => {
+                            if (error instanceof SyncAIError) {
+                              if (error.status) {
+                                return `Lỗi ${error.status}: ${error.message}`
+                              }
+                              return error.message
+                            }
+                            if (error instanceof Error) return error.message
+                            return 'Không thể khởi động tiến trình đồng bộ.'
+                          }
+                        }
+                      ).finally(() => setSyncingIncremental(false))
+                    }}
+                    disabled={syncingFull || syncingIncremental}
+                  >
+                    {syncingIncremental ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Ưu tiên embed
                   </Button>
                 </div>
               </CardContent>

@@ -13,9 +13,9 @@ interface MobileUserBarProps {
 
 export function MobileUserBar({ userName, userEmail, userRole }: MobileUserBarProps) {
   return (
-    <div className="md:hidden sticky top-0 z-40 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 py-3">
+    <div className="md:hidden sticky top-0 z-40 flex items-center justify-between border-none bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 py-3">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted">
           <User className="h-5 w-5 text-muted-foreground" />
         </div>
         <div className="min-w-0 flex-1">

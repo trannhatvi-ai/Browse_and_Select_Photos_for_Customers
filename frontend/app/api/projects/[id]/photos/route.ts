@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { buildPreviewUrl } from '@/lib/storage'
 import { buildBackendUrl } from '@/lib/backend-api'
+import { syncProjectPhotoAiContexts } from '@/lib/ai-context-sync'
 import { getCloudinaryCredentialsForProject, validateUserCloudinarySettings } from '@/lib/cloudinary-settings'
 import { v2 as cloudinary } from 'cloudinary'
 
@@ -96,7 +97,29 @@ export async function POST(
 
   // Không cập nhật photoCount vì field không tồn tại trong schema
 
-  // Indexing will be triggered from the frontend in a batch to improve performance
+  if (uploadedPhotos.length > 0) {
+    try {
+      const indexPayload = {
+        project_id: projectId,
+        urls: uploadedPhotos.map((photo: any) => photo.previewUrl),
+        rebuild: false,
+        project_created_at: project.createdAt.toISOString(),
+        project_expires_at: project.deadline.toISOString(),
+      }
+
+      // Chỉ gọi index để AI bắt đầu xử lý, không đợi kết quả
+      fetch(buildBackendUrl('/index'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(indexPayload),
+        cache: 'no-store',
+      }).catch(err => console.error('Failed to trigger background indexing:', err))
+      
+    } catch (error) {
+      console.error('Failed to start indexing after upload:', error)
+    }
+  }
+
   return NextResponse.json({ 
     success: true, 
     uploaded: uploadedPhotos.length,
@@ -145,6 +168,20 @@ export async function DELETE(
 
     // Xóa trong Database
     await prisma.photo.delete({ where: { id: photoId } })
+
+    // Thông báo cho Python backend để dừng xử lý AI nếu đang chạy
+    try {
+      fetch(buildBackendUrl('/cancel'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          urls: [photo.previewUrl]
+        }),
+      }).catch(err => console.error('Failed to notify cancel to backend:', err))
+    } catch (error) {
+      console.error('Error triggering cancellation:', error)
+    }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

@@ -3,8 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { buildBackendUrl } from '@/lib/backend-api'
 import { prisma } from '@/lib/db'
+import { syncProjectPhotoAiContexts } from '@/lib/ai-context-sync'
 
-export async function POST() {
+export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
   
   if (!session || session.user.role !== 'ADMIN') {
@@ -12,6 +13,10 @@ export async function POST() {
   }
 
   try {
+    // Parse fullRebuild from query parameters (default: true for backward compatibility)
+    const url = new URL(req.url)
+    const fullRebuild = url.searchParams.get('fullRebuild') !== 'false'
+
     // 1. Lấy tất cả project cùng với danh sách previewUrl của ảnh từ Supabase
     const projects = await prisma.project.findMany({
       select: {
@@ -42,7 +47,7 @@ export async function POST() {
         const indexPayload = {
           project_id: project.id,
           urls: project.photos.map(p => p.previewUrl),
-          rebuild: true,
+          rebuild: fullRebuild,
           project_created_at: project.createdAt.toISOString(),
           project_expires_at: project.deadline.toISOString()
         }
@@ -55,6 +60,7 @@ export async function POST() {
         })
 
         if (res.ok) {
+          await syncProjectPhotoAiContexts(project.id, project.photos.map(p => p.previewUrl))
           totalQueued++
         } else {
           errors.push(`Project ${project.id}: Backend returned ${res.status}`)

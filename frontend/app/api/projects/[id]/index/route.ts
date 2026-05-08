@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { buildBackendUrl } from '@/lib/backend-api'
+import { syncProjectPhotoAiContexts } from '@/lib/ai-context-sync'
 
 export async function POST(
   req: NextRequest,
@@ -43,7 +44,8 @@ export async function POST(
     }
 
     const data = await indexResponse.json()
-    return NextResponse.json({ success: true, ...data })
+    const synced = await syncProjectPhotoAiContexts(projectId, project.photos.map((photo) => photo.previewUrl))
+    return NextResponse.json({ success: true, ...data, synced })
   } catch (error: any) {
     console.error('Failed to trigger re-indexing:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

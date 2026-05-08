@@ -28,6 +28,9 @@ export async function PATCH(
   const updateData: {
     status?: 'CHOOSING' | 'DONE'
     maxSelections?: number
+    eventName?: string
+    clientName?: string
+    clientEmail?: string
   } = {}
 
   if (typeof body.status === 'string') {
@@ -37,7 +40,7 @@ export async function PATCH(
         { status: 400 }
       )
     }
-    updateData.status = body.status
+    updateData.status = body.status as 'CHOOSING' | 'DONE'
   }
 
   if (body.maxSelections !== undefined) {
@@ -51,6 +54,18 @@ export async function PATCH(
     }
 
     updateData.maxSelections = parsedMaxSelections
+  }
+
+  if (typeof body.eventName === 'string' && body.eventName.trim()) {
+    updateData.eventName = body.eventName.trim()
+  }
+
+  if (typeof body.clientName === 'string' && body.clientName.trim()) {
+    updateData.clientName = body.clientName.trim()
+  }
+
+  if (typeof body.clientEmail === 'string' && body.clientEmail.trim()) {
+    updateData.clientEmail = body.clientEmail.trim()
   }
 
   if (Object.keys(updateData).length === 0) {

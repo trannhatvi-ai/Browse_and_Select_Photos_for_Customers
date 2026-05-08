@@ -58,6 +58,7 @@ model Photo {
   size        Int        // bytes
   selected    Boolean    @default(false)
   comment     String?
+  aiContext   Json?
   selections  Selection[]
   uploadedAt  DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
