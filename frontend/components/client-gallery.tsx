@@ -275,35 +275,19 @@ export function ClientGallery({ token }: { token?: string }) {
     }
 
     try {
-        // Pre-translate query to English for better semantic matching
         setSemanticLoading(true)
-        let translatedQuery = query
-        try {
-          const tr = await fetch('/api/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: query }),
-            cache: 'no-store',
-          })
-          if (tr.ok) {
-            const trj = await tr.json()
-            if (trj?.translated_text) translatedQuery = trj.translated_text
-          }
-        } catch {
-          translatedQuery = query
-        }
-        setSemanticStatus(`Đang tìm ảnh theo mô tả: "${translatedQuery}"...`)
+        setSemanticStatus(`Đang tìm ảnh cho: "${query}"...`)
         setSemanticAlert({
           variant: 'info',
           title: 'Đang tìm ảnh',
-          description: `Đang tìm ảnh theo mô tả: "${translatedQuery}"...`,
+          description: `Đang tìm ảnh cho: "${query}"...`,
         })
       setSemanticMatchedIds(null)
       setHighlightedPhotoIds(new Set())
         const res = await fetch('/api/search/semantic', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ project_id: projectId, query: translatedQuery, top_k: 50 }),
+          body: JSON.stringify({ project_id: projectId, query: query, top_k: 50 }),
           cache: 'no-store',
         })
 

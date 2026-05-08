@@ -98,7 +98,12 @@ export default function ProjectDetailPage() {
   const [syncingAi, setSyncingAi] = useState(false)
   const [realProjectId, setRealProjectId] = useState<string | null>(null)
 
-  const aiSyncCompleted = Boolean(aiStats && aiStats.indexed_photos_qdrant >= aiStats.total_photos && aiStats.total_photos > 0)
+  const aiSyncCompleted = Boolean(
+    aiStats &&
+    aiStats.context_photos_db >= aiStats.total_photos &&
+    aiStats.indexed_photos_qdrant >= aiStats.total_photos &&
+    aiStats.total_photos > 0
+  )
   const aiSyncTooltip = aiSyncCompleted
     ? 'Tất cả ảnh đã sẵn sàng, không cần tạo ngữ cảnh nữa'
     : 'Tạo mô tả AI cho các ảnh mới'
@@ -516,7 +521,7 @@ export default function ProjectDetailPage() {
                       setSyncingAi(false)
                     }
                     }}
-                    disabled={syncingAi || aiSyncCompleted}
+                    disabled={loadingStats || syncingAi || aiSyncCompleted}
                   >
                     {syncingAi ? (
                       <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -531,7 +536,7 @@ export default function ProjectDetailPage() {
                 
                 {!aiSyncCompleted && aiStats && aiStats.total_photos > 0 && (
                    <p className="text-[10px] text-center text-muted-foreground italic">
-                     Tiến độ: {aiStats.indexed_photos_qdrant_images ?? aiStats.indexed_photos_qdrant ?? 0}/{aiStats.total_photos} ảnh sẵn sàng
+                     Tiến độ: {aiStats.indexed_photos_qdrant ?? 0}/{aiStats.total_photos} ảnh sẵn sàng
                    </p>
                 )}
               </div>
@@ -683,7 +688,7 @@ export default function ProjectDetailPage() {
                       setSyncingAi(false)
                     }
                   }}
-                  disabled={syncingAi}
+                  disabled={loadingStats || syncingAi || aiSyncCompleted}
                 >
                   {syncingAi ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : aiSyncCompleted ? <CheckCircle2 className="h-5 w-5 mr-2" /> : <Sparkles className="h-5 w-5 mr-2" />}
                   {aiSyncCompleted ? 'Đã hoàn thành AI' : 'Tạo ngữ cảnh AI'}
