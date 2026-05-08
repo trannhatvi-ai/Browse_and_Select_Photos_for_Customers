@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, Copy, ImageIcon, Loader2, Plus, RefreshCw, Save, Settings2, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, Check, CheckCircle2, ChevronDown, Copy, ImageIcon, LayoutGrid, Loader2, Maximize2, Plus, RefreshCw, Save, Settings2, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -17,6 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import {
   AlertDialog,
@@ -98,6 +104,9 @@ export default function ProjectDetailPage() {
   const [loadingStats, setLoadingStats] = useState(false)
   const [syncingAi, setSyncingAi] = useState(false)
   const [realProjectId, setRealProjectId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest')
+  const [syncingPhotos, setSyncingPhotos] = useState<Set<string>>(new Set())
 
   const aiSyncCompleted = Boolean(
     aiStats &&
@@ -204,7 +213,17 @@ export default function ProjectDetailPage() {
 
       toast.success('Đã xóa ảnh!')
       setDeletePhotoTarget(null)
-      setLightboxOpen(false)
+      
+      // Logic lướt qua ảnh tiếp theo khi xóa
+      if (lightboxOpen) {
+        if (photos.length <= 1) {
+          setLightboxOpen(false)
+        } else if (lightboxIndex >= photos.length - 1) {
+          setLightboxIndex(prev => Math.max(0, prev - 1))
+        }
+        // Nếu không phải ảnh cuối, giữ nguyên index thì nó tự động là ảnh tiếp theo sau khi list cập nhật
+      }
+      
       await fetchDetails()
     } catch (error) {
       toast.error((error as Error).message || 'Lỗi kết nối!')
@@ -379,7 +398,47 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 lg:hidden">
+          <div className="flex items-center gap-2">
+            <div className="hidden lg:block">
+               <div title={aiSyncTooltip}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    'h-10 px-4 gap-2 rounded-xl transition-all shadow-sm',
+                    aiSyncCompleted
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 opacity-90'
+                      : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                  )}
+                  onClick={async () => {
+                    if (aiSyncCompleted) return
+                    setSyncingAi(true)
+                    try {
+                      const idToUse = realProjectId || project.id
+                      const res = await fetch(`/api/ai-stats/projects/${idToUse}/sync`, { method: 'POST' })
+                      if (res.ok) {
+                        const data = await res.json()
+                        toast.success(`Đã bắt đầu tạo ngữ cảnh cho ${data.queued_count} ảnh!`)
+                        setTimeout(fetchAiStats, 2000)
+                      }
+                    } catch (err) {} finally {
+                      setSyncingAi(false)
+                    }
+                  }}
+                  disabled={loadingStats || syncingAi || aiSyncCompleted}
+                >
+                  {syncingAi ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : aiSyncCompleted ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  <span className="hidden xl:inline">{aiSyncCompleted ? 'Đã hoàn thành AI' : 'Tạo ngữ cảnh AI'}</span>
+                </Button>
+              </div>
+            </div>
+
             <Button variant="outline" size="sm" className="h-9 gap-2 sm:h-10" onClick={() => document.getElementById('quick-upload')?.click()}>
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Thêm ảnh</span>
@@ -400,243 +459,79 @@ export default function ProjectDetailPage() {
         </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Card className="overflow-hidden border-none shadow-none bg-transparent">
-          <CardContent className="p-0 sm:p-2">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-              {photos.map((photo, index) => {
-                const hasContext = Boolean(photo.aiContext && typeof photo.aiContext === 'object')
-
-                return (
-                  <div
-                    key={photo.id}
-                    className={cn(
-                      'group relative aspect-square overflow-hidden rounded-xl bg-muted/80 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg',
-                      hasContext ? 'ring-1 ring-emerald-400/20' : 'ring-0'
-                    )}
-                    onClick={() => {
-                      setLightboxIndex(index)
-                      setLightboxOpen(true)
-                    }}
-                  >
-                    <img
-                      src={photo.previewUrl}
-                      alt={photo.filename}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity" />
-
-                    {photo.selected && (
-                      <div className="absolute right-2 top-2 z-10">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg">
-                          <CheckCircle2 className="h-4 w-4" />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="absolute inset-0 flex flex-col justify-end p-2 sm:p-3 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                      <div className="flex items-center justify-between gap-2">
-
-                        <div className="flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              openAiSheet(photo)
-                            }}
-                            className="rounded-md bg-white/90 p-2 text-amber-600 shadow-sm transition hover:bg-white"
-                            title="Xem ngữ cảnh Gemini"
-                          >
-                            <Sparkles className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setDeletePhotoTarget(photo)
-                            }}
-                            className="rounded-md bg-white/90 p-2 text-red-600 shadow-sm transition hover:bg-white"
-                            title="Xóa ảnh"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1 text-left">
-                        <p className="max-w-full truncate text-[11px] font-medium text-white sm:text-xs">
-                          {photo.filename}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {photoCount === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-none border-none px-6 py-16 text-center text-muted-foreground">
-                <ImageIcon className="mb-3 h-10 w-10 opacity-30" />
-                <p className="text-sm font-medium">Chưa có ảnh nào trong show chụp này</p>
-                <p className="mt-1 text-xs">Hãy upload ảnh để bắt đầu.</p>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <aside className="hidden lg:block">
-          <div className="sticky top-24 space-y-6">
-              <div className="space-y-3 pt-2">
-                <div title={aiSyncTooltip} className="w-full">
-                  <Button
-                    className={cn(
-                      'w-full h-12 rounded-2xl shadow-lg transition-all',
-                      aiSyncCompleted
-                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 cursor-not-allowed opacity-90'
-                        : 'bg-amber-500 hover:bg-amber-600 text-white'
-                    )}
-                    onClick={async () => {
-                    if (aiSyncCompleted) return
-                    setSyncingAi(true)
-                    try {
-                      const idToUse = realProjectId || project.id
-                      const res = await fetch(`/api/ai-stats/projects/${idToUse}/sync`, { method: 'POST' })
-                      if (res.ok) {
-                        const data = await res.json()
-                        toast.success(`Đã bắt đầu tạo ngữ cảnh cho ${data.queued_count} ảnh!`)
-                        setTimeout(fetchAiStats, 2000)
-                      } else {
-                        toast.error('Không thể bắt đầu tạo ngữ cảnh')
-                      }
-                    } catch (err) {
-                      toast.error('Lỗi kết nối')
-                    } finally {
-                      setSyncingAi(false)
-                    }
-                    }}
-                    disabled={loadingStats || syncingAi || aiSyncCompleted}
-                  >
-                    {syncingAi ? (
-                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    ) : aiSyncCompleted ? (
-                      <CheckCircle2 className="h-5 w-5 mr-2" />
-                    ) : (
-                      <Sparkles className="h-5 w-5 mr-2" />
-                    )}
-                    {aiSyncCompleted ? 'Đã hoàn thành AI' : 'Tạo ngữ cảnh AI'}
-                  </Button>
-                </div>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {photos.map((photo, index) => {
+            const isSelected = lightboxIndex === index
+            
+            return (
+              <div
+                key={photo.id}
+                className={cn(
+                  'group relative aspect-[3/4] cursor-pointer overflow-hidden rounded-2xl bg-muted transition-all duration-300 hover:shadow-xl',
+                  isSelected && 'ring-2 ring-primary ring-offset-2'
+                )}
+                onClick={() => {
+                  setLightboxIndex(index)
+                  setLightboxOpen(true)
+                }}
+              >
+                <img
+                  src={photo.previewUrl || photo.url}
+                  alt={photo.filename}
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  loading="lazy"
+                />
                 
-                {!aiSyncCompleted && aiStats && aiStats.total_photos > 0 && (
-                   <p className="text-[10px] text-center text-muted-foreground italic">
-                     Tiến độ: {aiStats.indexed_photos_qdrant ?? 0}/{aiStats.total_photos} ảnh sẵn sàng
-                   </p>
-                )}
-              </div>
-
-            <div className="space-y-1 px-1">
-              <h2 className="text-lg font-bold tracking-tight">Cấu hình</h2>
-              <p className="text-xs text-muted-foreground">Thiết lập các thông số cho show chụp.</p>
-            </div>
-
-            <div className="rounded-3xl border bg-muted/30 p-5 space-y-8">
-              <div className="space-y-6">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <Settings2 className="h-4 w-4 text-primary" />
-                    Thông tin show chụp
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                  <div className="absolute right-2 top-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openAiSheet(photo)
+                      }}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-amber-400 backdrop-blur-md transition-all hover:bg-black/60 shadow-lg"
+                      title="AI Insight"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Cập nhật thông tin cơ bản và trạng thái show.</p>
-                </div>
-
-                <div className="grid gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="event-name-side" className="text-[11px] font-medium text-muted-foreground">Tên sự kiện</Label>
-                    <Input id="event-name-side" value={eventNameDraft} onChange={e => setEventNameDraft(e.target.value)} className="bg-background" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="client-name-side" className="text-[11px] font-medium text-muted-foreground">Khách hàng</Label>
-                    <Input id="client-name-side" value={clientNameDraft} onChange={e => setClientNameDraft(e.target.value)} className="bg-background" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="client-email-side" className="text-[11px] font-medium text-muted-foreground">Email liên hệ</Label>
-                    <Input id="client-email-side" type="email" value={clientEmailDraft} onChange={e => setClientEmailDraft(e.target.value)} className="bg-background" />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-[11px] font-medium text-muted-foreground">Trạng thái</Label>
-                      <Select value={statusDraft} onValueChange={(v: any) => setStatusDraft(v)}>
-                        <SelectTrigger className="bg-background">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="CHOOSING">Đang chọn</SelectItem>
-                          <SelectItem value="DONE">Hoàn thành</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="max-selections-side" className="text-[11px] font-medium text-muted-foreground">Giới hạn ảnh</Label>
-                      <Input
-                        id="max-selections-side"
-                        type="number"
-                        min={1}
-                        value={maxSelectionsDraft}
-                        onChange={(event) => setMaxSelectionsDraft(event.target.value)}
-                        className="bg-background"
-                      />
+                  
+                  <div className="absolute inset-x-0 bottom-0 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-[10px] font-medium text-white/90">{photo.filename}</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setDeletePhotoTarget(photo)
+                        }}
+                        className="text-white/60 hover:text-red-400 transition-colors"
+                        title="Xóa ảnh"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="space-y-4 pt-6 border-t border-dashed">
-                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Upload className="h-4 w-4 text-sky-600" />
-                  Tải lên ảnh mới
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full h-24 flex-col gap-2 border-dashed border-2 bg-background/40 hover:bg-background/60"
-                  onClick={() => document.getElementById('side-upload')?.click()}
-                >
-                  <Plus className="h-6 w-6 text-muted-foreground" />
-                  <span className="text-xs font-medium">Click để chọn ảnh</span>
-                  <input
-                    id="side-upload"
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleUploadFiles(e.target.files)}
-                  />
-                </Button>
-
-                {uploadFiles.length > 0 && (
-                  <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
-                    {uploadFiles.map(file => (
-                      <div key={file.id} className="text-[10px] space-y-1.5 p-2.5 rounded-xl bg-background border shadow-sm">
-                        <div className="flex justify-between gap-2">
-                          <span className="truncate flex-1 font-medium">{file.name}</span>
-                          <span className="text-muted-foreground">{file.status === 'complete' ? 'Xong' : `${file.progress}%`}</span>
-                        </div>
-                        <Progress value={file.progress} className="h-1" />
-                      </div>
-                    ))}
+                {photo.selected && (
+                  <div className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white shadow-lg ring-2 ring-white">
+                    <Check className="h-3.5 w-3.5 stroke-[3]" />
                   </div>
                 )}
               </div>
+            )
+          })}
+        </div>
 
-              <Button className="h-12 w-full gap-2 rounded-2xl text-base shadow-xl" onClick={handleSaveConfig} disabled={saving}>
-                {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                Lưu cấu hình
-              </Button>
-            </div>
+        {photoCount === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+            <ImageIcon className="mb-4 h-12 w-12 opacity-20" />
+            <p className="text-lg font-semibold text-foreground/70">Chưa có ảnh nào</p>
+            <p className="text-sm">Hãy upload ảnh để bắt đầu show chụp.</p>
           </div>
-        </aside>
-      </div>
+        )}
+      </main>
 
 
 
@@ -783,7 +678,6 @@ export default function ProjectDetailPage() {
         onDelete={(photo) => {
           const target = photos.find((item) => item.id === photo.id) ?? null
           setDeletePhotoTarget(target)
-          setLightboxOpen(false)
         }}
       />
 
@@ -794,7 +688,7 @@ export default function ProjectDetailPage() {
       />
 
       <AlertDialog open={Boolean(deletePhotoTarget)} onOpenChange={(open) => !open && setDeletePhotoTarget(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="z-[150]">
           <AlertDialogHeader>
             <AlertDialogTitle>Xóa ảnh này?</AlertDialogTitle>
             <AlertDialogDescription>

@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { X, Heart, MessageCircle, ChevronLeft, ChevronRight, Columns2, Rows2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { X, Heart, MessageCircle, ChevronLeft, ChevronRight, Columns2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Photo } from '@/lib/types'
 
@@ -14,8 +13,6 @@ interface ComparisonViewerProps {
   onComment: (id: string) => void
 }
 
-type LayoutMode = 'side-by-side' | 'stacked'
-
 export function ComparisonViewer({
   photos,
   isOpen,
@@ -26,7 +23,6 @@ export function ComparisonViewer({
   const [leftIndex, setLeftIndex] = useState(0)
   const [rightIndex, setRightIndex] = useState(1)
   const [activeSide, setActiveSide] = useState<'left' | 'right'>('left')
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('stacked')
 
   const leftPhoto = photos[leftIndex]
   const rightPhoto = photos[rightIndex]
@@ -69,21 +65,10 @@ export function ComparisonViewer({
   }, [isOpen])
 
   useEffect(() => {
-    const updateLayoutMode = () => {
-      setLayoutMode(window.innerWidth < 640 ? 'stacked' : 'side-by-side')
-    }
-
-    updateLayoutMode()
-    window.addEventListener('resize', updateLayoutMode)
-    return () => window.removeEventListener('resize', updateLayoutMode)
-  }, [])
-
-  useEffect(() => {
     if (!isOpen) return
     setLeftIndex(0)
     setRightIndex(Math.min(1, photos.length - 1))
     setActiveSide('left')
-    setLayoutMode(window.innerWidth < 640 ? 'stacked' : 'side-by-side')
   }, [isOpen, photos.length])
 
   if (!isOpen || photos.length < 2) return null
@@ -98,149 +83,250 @@ export function ComparisonViewer({
     }
   }
 
-  const renderPhotoPanel = (photo: Photo, side: 'left' | 'right', index: number) => {
-    const isActive = activeSide === side
-
-    return (
-      <div
-        className={cn(
-          'relative flex h-full min-h-0 flex-col overflow-hidden bg-black/95 transition-all',
-          isActive && 'ring-2 ring-inset ring-accent'
-        )}
-        onClick={() => setActiveSide(side)}
-      >
-        {isActive && (
-          <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-accent px-3 py-1 text-xs font-medium text-white">
-            Đang chọn
-          </div>
-        )}
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            navigatePhoto(side, 'prev')
-          }}
-          disabled={index === 0}
-          className={cn(
-            'absolute left-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20',
-            index === 0 && 'cursor-not-allowed opacity-30'
-          )}
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            navigatePhoto(side, 'next')
-          }}
-          disabled={index === photos.length - 1}
-          className={cn(
-            'absolute right-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20',
-            index === photos.length - 1 && 'cursor-not-allowed opacity-30'
-          )}
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-
-        <div className="flex flex-1 min-h-0 items-center justify-center p-2 sm:p-4">
-          <div className="relative flex h-full max-h-full max-w-full items-center justify-center">
-            <img
-              src={photo.src}
-              alt={photo.filename}
-              className={cn('max-w-full object-contain', layoutMode === 'stacked' ? 'max-h-full' : 'max-h-[70vh]')}
-              crossOrigin="anonymous"
-            />
-          </div>
-        </div>
-
-        <div className="shrink-0 bg-gradient-to-t from-black/80 to-transparent p-3 sm:p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 text-white">
-              <p className="truncate font-medium">{photo.filename}</p>
-              <p className="text-sm text-white/60">
-                {index + 1} / {photos.length}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onSelect(photo.id)
-                }}
-                className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
-                  photo.selected ? 'bg-accent text-white' : 'bg-white/20 text-white hover:bg-white/30'
-                )}
-                aria-label={photo.selected ? 'Bỏ chọn ảnh' : 'Chọn ảnh'}
-              >
-                <Heart className={cn('h-5 w-5', photo.selected && 'fill-current')} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onComment(photo.id)
-                }}
-                className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
-                  photo.comment ? 'bg-primary text-white' : 'bg-white/20 text-white hover:bg-white/30'
-                )}
-                aria-label="Thêm ghi chú"
-              >
-                <MessageCircle className={cn('h-5 w-5', photo.comment && 'fill-current')} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
-      <div className="flex items-center justify-between gap-3 bg-black/80 px-4 py-3">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-black">
+      {/* Header - Desktop only */}
+      <div className="hidden sm:flex items-center justify-between gap-3 bg-black/80 px-4 py-3 border-b border-white/10 shrink-0">
         <div className="flex min-w-0 items-center gap-3 text-white">
-          <Columns2 className="h-5 w-5" />
-          <span className="font-medium">So sánh ảnh</span>
+          <Columns2 className="h-5 w-5 text-accent" />
+          <span className="font-medium text-lg">So sánh ảnh</span>
           <span className="hidden text-sm text-white/60 sm:inline">
-            (Nhấn Tab để chuyển bên, mũi tên để chuyển ảnh)
+            (Nhấn Tab để chuyển bên, lướt hoặc mũi tên để chuyển ảnh)
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setLayoutMode((current) => (current === 'stacked' ? 'side-by-side' : 'stacked'))}
-            className="border-white/15 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-          >
-            {layoutMode === 'stacked' ? (
-              <>
-                <Rows2 className="mr-2 h-4 w-4" />
-                Trên dưới
-              </>
-            ) : (
-              <>
-                <Columns2 className="mr-2 h-4 w-4" />
-                2 bên
-              </>
-            )}
-          </Button>
+        <button
+          onClick={onClose}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          aria-label="Đóng"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
 
-          <button
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-            aria-label="Đóng"
-          >
-            <X className="h-5 w-5" />
-          </button>
+      {/* Floating Close Button - Mobile only */}
+      <button
+        onClick={onClose}
+        className="sm:hidden fixed top-4 right-4 z-[70] flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md border border-white/10 active:scale-95 transition-all"
+        aria-label="Đóng"
+      >
+        <X className="h-5 w-5" />
+      </button>
+
+      {/* Grid container */}
+      <div className="grid flex-1 min-h-0 gap-1 overflow-hidden grid-cols-1 sm:grid-cols-2">
+        <PhotoPanel
+          photo={leftPhoto}
+          side="left"
+          index={leftIndex}
+          total={photos.length}
+          isActive={activeSide === 'left'}
+          onSelect={onSelect}
+          onComment={onComment}
+          setActiveSide={setActiveSide}
+          navigatePhoto={navigatePhoto}
+        />
+        <PhotoPanel
+          photo={rightPhoto}
+          side="right"
+          index={rightIndex}
+          total={photos.length}
+          isActive={activeSide === 'right'}
+          onSelect={onSelect}
+          onComment={onComment}
+          setActiveSide={setActiveSide}
+          navigatePhoto={navigatePhoto}
+        />
+      </div>
+
+      {/* Top Logo/Indicator - Mobile only */}
+      <div className="sm:hidden fixed top-4 left-4 z-[70] flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md border border-white/10 shadow-lg animate-pulse">
+        <Columns2 className="h-5 w-5 text-accent" />
+      </div>
+    </div>
+  )
+}
+
+interface PhotoPanelProps {
+  photo: Photo
+  side: 'left' | 'right'
+  index: number
+  total: number
+  isActive: boolean
+  onSelect: (id: string) => void
+  onComment: (id: string) => void
+  setActiveSide: (side: 'left' | 'right') => void
+  navigatePhoto: (side: 'left' | 'right', direction: 'prev' | 'next') => void
+}
+
+function PhotoPanel({
+  photo,
+  side,
+  index,
+  total,
+  isActive,
+  onSelect,
+  onComment,
+  setActiveSide,
+  navigatePhoto
+}: PhotoPanelProps) {
+  const [lastTap, setLastTap] = useState(0)
+  const [showHeart, setShowHeart] = useState(false)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchDiff, setTouchDiff] = useState(0)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.touches[0].clientX)
+    setTouchDiff(0)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart === null) return
+    const currentX = e.touches[0].clientX
+    setTouchDiff(currentX - touchStart)
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const now = Date.now()
+    if (now - lastTap < 300) {
+      onSelect(photo.id)
+      setShowHeart(true)
+      setTimeout(() => setShowHeart(false), 800)
+    }
+    setLastTap(now)
+
+    if (Math.abs(touchDiff) > 50) {
+      if (touchDiff < 0) navigatePhoto(side, 'next')
+      else navigatePhoto(side, 'prev')
+    }
+    setTouchStart(null)
+    setTouchDiff(0)
+  }
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    onSelect(photo.id)
+    setShowHeart(true)
+    setTimeout(() => setShowHeart(false), 800)
+  }
+
+  return (
+    <div
+      className={cn(
+        'relative flex h-full min-h-0 flex-col overflow-hidden bg-black/95 transition-all',
+        isActive && 'ring-2 ring-inset ring-accent'
+      )}
+      onClick={() => setActiveSide(side)}
+      onDoubleClick={handleDoubleClick}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {isActive && (
+        <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-accent px-3 py-1 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
+          Đang chọn
+        </div>
+      )}
+
+      {showHeart && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <Heart className="h-24 w-24 fill-accent text-accent animate-ping" />
+        </div>
+      )}
+
+      {/* Swipe Arrows Indicators */}
+      <div 
+        className="pointer-events-none absolute left-4 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md transition-opacity duration-200"
+        style={{ opacity: touchDiff > 20 ? Math.min(touchDiff / 100, 0.8) : 0 }}
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </div>
+      <div 
+        className="pointer-events-none absolute right-4 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md transition-opacity duration-200"
+        style={{ opacity: touchDiff < -20 ? Math.min(Math.abs(touchDiff) / 100, 0.8) : 0 }}
+      >
+        <ChevronRight className="h-6 w-6" />
+      </div>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          navigatePhoto(side, 'prev')
+        }}
+        disabled={index === 0}
+        className={cn(
+          'absolute left-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-md transition-all hover:bg-black/50 sm:flex hidden',
+          index === 0 && 'cursor-not-allowed opacity-0'
+        )}
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          navigatePhoto(side, 'next')
+        }}
+        disabled={index === total - 1}
+        className={cn(
+          'absolute right-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-md transition-all hover:bg-black/50 sm:flex hidden',
+          index === total - 1 && 'cursor-not-allowed opacity-0'
+        )}
+      >
+        <ChevronRight className="h-6 w-6" />
+      </button>
+
+      <div className="flex flex-1 min-h-0 items-center justify-center p-2 sm:p-4">
+        <div className="relative flex h-full max-h-full max-w-full items-center justify-center">
+          <img
+            src={photo.src}
+            alt={photo.filename}
+            className="max-h-full max-w-full object-contain pointer-events-none select-none"
+            crossOrigin="anonymous"
+            style={{ 
+              transform: touchStart !== null ? `translateX(${touchDiff}px)` : 'none',
+              transition: touchStart !== null ? 'none' : 'transform 0.3s ease'
+            }}
+          />
         </div>
       </div>
 
-      <div className={cn('grid flex-1 min-h-0 gap-1 overflow-hidden', layoutMode === 'stacked' ? 'grid-rows-2' : 'grid-cols-2')}>
-        {renderPhotoPanel(leftPhoto, 'left', leftIndex)}
-        {renderPhotoPanel(rightPhoto, 'right', rightIndex)}
+      <div className="shrink-0 bg-gradient-to-t from-black/90 to-transparent p-4 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 text-white">
+            <p className="truncate font-medium text-lg">{photo.filename}</p>
+            <p className="text-sm text-white/50">
+              {index + 1} / {total}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onSelect(photo.id)
+              }}
+              className={cn(
+                'flex h-12 w-12 items-center justify-center rounded-full transition-all border border-white/10 active:scale-90',
+                photo.selected ? 'bg-accent text-white shadow-[0_0_15px_rgba(var(--accent-rgb),0.4)]' : 'bg-white/10 text-white hover:bg-white/20'
+              )}
+              aria-label={photo.selected ? 'Bỏ chọn ảnh' : 'Chọn ảnh'}
+            >
+              <Heart className={cn('h-6 w-6', photo.selected && 'fill-current')} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onComment(photo.id)
+              }}
+              className={cn(
+                'flex h-12 w-12 items-center justify-center rounded-full transition-all border border-white/10 active:scale-90',
+                photo.comment ? 'bg-primary text-white shadow-[0_0_15px_rgba(var(--primary-rgb),0.4)]' : 'bg-white/10 text-white hover:bg-white/20'
+              )}
+              aria-label="Thêm ghi chú"
+            >
+              <MessageCircle className={cn('h-6 w-6', photo.comment && 'fill-current')} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

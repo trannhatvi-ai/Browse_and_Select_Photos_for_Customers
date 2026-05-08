@@ -22,7 +22,27 @@ export function StudioLightbox({
   onDelete,
 }: StudioLightboxProps) {
   const currentPhoto = photos[currentIndex]
-  const [isZoomed, setIsZoomed] = useState(false)
+  const [scale, setScale] = useState(1)
+  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [lastTap, setLastTap] = useState(0)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setScale(prev => Math.min(prev + 0.5, 3))
+  }
+
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setScale(prev => {
+      const next = Math.max(prev - 0.5, 1)
+      if (next === 1) setPosition({ x: 0, y: 0 })
+      return next
+    })
+  }
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -31,6 +51,14 @@ export function StudioLightbox({
       if (e.key === 'ArrowLeft' && currentIndex > 0) onNavigate(currentIndex - 1)
       if (e.key === 'ArrowRight' && currentIndex < photos.length - 1)
         onNavigate(currentIndex + 1)
+      if (e.key === '=' || e.key === '+') setScale(prev => Math.min(prev + 0.5, 3))
+      if (e.key === '-') {
+        setScale(prev => {
+          const next = Math.max(prev - 0.5, 1)
+          if (next === 1) setPosition({ x: 0, y: 0 })
+          return next
+        })
+      }
     },
     [isOpen, currentIndex, photos.length, onClose, onNavigate]
   )
@@ -52,31 +80,67 @@ export function StudioLightbox({
   }, [isOpen])
 
   useEffect(() => {
-    setIsZoomed(false)
+    // scale(1) removed to keep zoom when navigating as requested
+    setDragOffset(0)
   }, [currentIndex])
 
-  const [touchStart, setTouchStart] = useState<number | null>(null)
-  const [touchEnd, setTouchEnd] = useState<number | null>(null)
-
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null)
     setTouchStart(e.targetTouches[0].clientX)
+    
+    // Optional: double tap feedback or action for admin
+    const now = Date.now()
+    if (now - lastTap < 300) {
+      // For studio admin, maybe just visual zoom toggle or do nothing
+    }
+    setLastTap(now)
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX)
+    if (touchStart !== null && scale === 1) {
+      const currentX = e.targetTouches[0].clientX
+      setDragOffset(currentX - touchStart)
+    }
   }
 
   const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return
-    const distance = touchStart - touchEnd
-    const isLeftSwipe = distance > 50
-    const isRightSwipe = distance < -50
-    
-    if (isLeftSwipe && currentIndex < photos.length - 1) {
-      onNavigate(currentIndex + 1)
-    } else if (isRightSwipe && currentIndex > 0) {
-      onNavigate(currentIndex - 1)
+    if (touchStart !== null && scale === 1) {
+      if (dragOffset > 80 && currentIndex > 0) {
+        onNavigate(currentIndex - 1)
+      } else if (dragOffset < -80 && currentIndex < photos.length - 1) {
+        onNavigate(currentIndex + 1)
+      }
+    }
+    setTouchStart(null)
+    setDragOffset(0)
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale > 1) {
+      setIsDragging(true)
+      setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
+    }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging && scale > 1) {
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      })
+    }
+  }
+
+  const handleMouseUp = () => setIsDragging(false)
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.deltaY < 0) {
+      setScale(prev => Math.min(prev + 0.1, 5))
+    } else {
+      setScale(prev => {
+        const next = Math.max(prev - 0.1, 1)
+        if (next === 1) setPosition({ x: 0, y: 0 })
+        return next
+      })
     }
   }
 
@@ -84,42 +148,76 @@ export function StudioLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black overflow-hidden"
       onClick={onClose}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-[110] flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-        aria-label="Đóng"
-      >
-        <X className="h-5 w-5" />
-      </button>
+      {/* Top tools */}
+      <div className="absolute top-4 right-4 z-[110] flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2 mr-4 bg-white/10 rounded-full p-1 backdrop-blur-md">
+          <button
+            onClick={handleZoomOut}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white hover:bg-white/20 transition-colors"
+          >
+            <span className="text-xl font-bold">-</span>
+          </button>
+          <span className="text-[10px] text-white/60 min-w-[3ch] text-center">{Math.round(scale * 100)}%</span>
+          <button
+            onClick={handleZoomIn}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white hover:bg-white/20 transition-colors"
+          >
+            <span className="text-xl font-bold">+</span>
+          </button>
+        </div>
+        <button
+          onClick={onClose}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          aria-label="Đóng"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
 
-      {/* Navigation - Previous */}
-      {currentIndex > 0 && (
+      {/* Swipe Indicators */}
+      {dragOffset > 0 && currentIndex > 0 && (
+        <div 
+          className="pointer-events-none absolute left-8 z-[120] flex h-16 w-16 items-center justify-center rounded-full bg-white/30 text-white backdrop-blur-md transition-opacity"
+          style={{ opacity: Math.min(dragOffset / 60, 0.9) }}
+        >
+          <ChevronLeft className="h-10 w-10" />
+        </div>
+      )}
+      {dragOffset < 0 && currentIndex < photos.length - 1 && (
+        <div 
+          className="pointer-events-none absolute right-8 z-[120] flex h-16 w-16 items-center justify-center rounded-full bg-white/30 text-white backdrop-blur-md transition-opacity"
+          style={{ opacity: Math.min(Math.abs(dragOffset) / 60, 0.9) }}
+        >
+          <ChevronRight className="h-10 w-10" />
+        </div>
+      )}
+
+      {/* Navigation - Desktop Only */}
+      {currentIndex > 0 && dragOffset === 0 && (
         <button
           onClick={(e) => {
             e.stopPropagation()
             onNavigate(currentIndex - 1)
           }}
-          className="absolute left-4 z-[110] flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          className="hidden sm:flex absolute left-4 z-[110] h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
         >
           <ChevronLeft className="h-6 w-6" />
         </button>
       )}
 
-      {/* Navigation - Next */}
-      {currentIndex < photos.length - 1 && (
+      {currentIndex < photos.length - 1 && dragOffset === 0 && (
         <button
           onClick={(e) => {
             e.stopPropagation()
             onNavigate(currentIndex + 1)
           }}
-          className="absolute right-4 z-[110] flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          className="hidden sm:flex absolute right-4 z-[110] h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
         >
           <ChevronRight className="h-6 w-6" />
         </button>
@@ -128,31 +226,31 @@ export function StudioLightbox({
       {/* Image container */}
       <div
         className={cn(
-          'relative flex max-h-[85vh] max-w-[90vw] items-center justify-center overflow-hidden rounded-lg px-4 py-8',
-          'touch-manipulation'
+          'relative flex h-full w-full items-center justify-center',
+          'touch-manipulation select-none',
+          scale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
         )}
-        onClick={(e) => {
-          e.stopPropagation()
-          setIsZoomed((value) => !value)
-        }}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onWheel={handleWheel}
       >
         <img
           src={currentPhoto.src || currentPhoto.previewUrl || (currentPhoto.originalUrl?.startsWith('http') ? currentPhoto.originalUrl : null) || currentPhoto.url}
           alt={currentPhoto.filename}
-          className={cn(
-            'max-h-[85vh] max-w-[90vw] object-contain transition-transform duration-300 ease-out will-change-transform',
-            isZoomed && 'scale-150 sm:scale-[1.85]'
-          )}
+          style={{ 
+            transform: `translate(${position.x + dragOffset}px, ${position.y}px) scale(${scale})`,
+            transition: isDragging || touchStart !== null ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)'
+          }}
+          className="max-h-full max-w-full object-contain pointer-events-none will-change-transform"
         />
       </div>
 
-      <div className="pointer-events-none absolute top-16 left-1/2 z-[110] -translate-x-1/2 rounded-full bg-black/40 px-3 py-1 text-[11px] text-white/80 backdrop-blur-sm">
-        {isZoomed ? 'Nhấp để thu nhỏ' : 'Nhấp để phóng to'}
-      </div>
-
       {/* Bottom bar */}
-      <div className="absolute bottom-0 inset-x-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent p-6 pt-16 z-[110]">
-        <div className="text-white">
+      <div className="absolute bottom-0 inset-x-0 flex items-center justify-between bg-gradient-to-t from-black to-transparent p-6 pt-20 pb-10 z-[110] pointer-events-none">
+        <div className="text-white pointer-events-auto">
           <p className="font-medium text-lg">{currentPhoto.filename}</p>
           <div className="mt-1 flex items-center gap-2 text-sm text-white/60">
             <p>
@@ -165,16 +263,16 @@ export function StudioLightbox({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pointer-events-auto">
           <button
             onClick={(e) => {
               e.stopPropagation()
               onDelete(currentPhoto)
             }}
-            className="flex h-12 items-center gap-2 rounded-full bg-red-600 px-6 text-white shadow-lg transition-all hover:bg-red-700 active:scale-95"
+            className="flex h-12 items-center gap-2 rounded-xl bg-white/10 px-6 text-white transition-all hover:bg-red-600 active:scale-95 border border-white/10"
           >
-            <Trash2 className="h-5 w-5" />
-            <span className="font-medium">Xóa ảnh</span>
+            <Trash2 className="h-4 w-4" />
+            <span className="text-xs font-semibold tracking-widest uppercase">Xóa ảnh</span>
           </button>
         </div>
       </div>
