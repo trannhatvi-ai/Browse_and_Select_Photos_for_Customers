@@ -1,25 +1,10 @@
-import { Queue, QueueScheduler, Worker, Job } from 'bull'
-import Redis from 'ioredis'
 import { Resend } from 'resend'
-
-const connection = process.env.REDIS_URL
-  ? new Redis(process.env.REDIS_URL)
-  : undefined // Bull requires Redis; fallback to sync sending
 
 export interface EmailJobData {
   to: string
   subject: string
   html: string
   from?: string
-}
-
-// Bull Queue (requires Redis)
-export const emailQueue = connection
-  ? new Queue<EmailJobData>('email', { connection })
-  : null
-
-if (connection) {
-  new QueueScheduler('email', { connection })
 }
 
 // Resend client
@@ -68,14 +53,9 @@ export const templates = {
   }),
 }
 
-// Send email (direct or queued)
+// Send email directly through Resend
 export async function queueEmail(data: EmailJobData) {
-  if (emailQueue) {
-    await emailQueue.add('send', data)
-  } else {
-    // Sync send for dev
-    await sendEmailDirect(data)
-  }
+  await sendEmailDirect(data)
 }
 
 async function sendEmailDirect(data: EmailJobData) {
@@ -88,15 +68,3 @@ async function sendEmailDirect(data: EmailJobData) {
   })
 }
 
-// Worker process (run separately or inline)
-if (emailQueue && require.main === module) {
-  emailQueue.process('send', async (job: Job<EmailJobData>) => {
-    const { to, subject, html, from } = job.data
-    await resend.emails.send({
-      from: from || process.env.EMAIL_FROM || 'noreply@studio.com',
-      to,
-      subject,
-      html,
-    })
-  })
-}

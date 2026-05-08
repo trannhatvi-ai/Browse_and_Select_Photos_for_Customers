@@ -21,7 +21,6 @@
 Added dependencies:
 - `prisma`, `@prisma/client`
 - `next-auth`, `bcryptjs`
-- `bull`, `ioredis`
 - `sharp`
 - `resend`
 - `@aws-sdk/client-s3`

@@ -32,7 +32,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { studioName, phone, email, cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret, allowSharedCloudinary, watermarkText, watermarkOpacity } = body
+  const { 
+    studioName, phone, email, 
+    cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret, 
+    allowSharedCloudinary, watermarkText, watermarkOpacity,
+    vlmProvider, vlmApiKey, vlmApiBase, vlmModelId
+  } = body
 
   const settings = await prisma.settings.upsert({
     where: { userId: session.user.id },
@@ -45,7 +50,11 @@ export async function POST(req: NextRequest) {
       cloudinaryApiSecret,
       allowSharedCloudinary,
       watermarkText,
-      watermarkOpacity: parseInt(watermarkOpacity) || 30
+      watermarkOpacity: parseInt(watermarkOpacity) || 30,
+      vlmProvider,
+      vlmApiKey,
+      vlmApiBase,
+      vlmModelId
     },
     create: {
       userId: session.user.id,
@@ -57,7 +66,11 @@ export async function POST(req: NextRequest) {
       cloudinaryApiSecret,
       allowSharedCloudinary,
       watermarkText,
-      watermarkOpacity: parseInt(watermarkOpacity) || 30
+      watermarkOpacity: parseInt(watermarkOpacity) || 30,
+      vlmProvider,
+      vlmApiKey,
+      vlmApiBase,
+      vlmModelId
     }
   })
 

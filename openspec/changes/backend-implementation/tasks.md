@@ -2,7 +2,7 @@
 
 ## Phase 0: Infrastructure Setup
 
-- [ ] 0.1 Install dependencies: `pnpm add prisma @prisma/client next-auth bcryptjs bull ioredis sharp resend @aws-sdk/client-s3`
+- [ ] 0.1 Install dependencies: `pnpm add prisma @prisma/client next-auth bcryptjs sharp resend @aws-sdk/client-s3`
 - [ ] 0.2 Setup environment variables in `.env.example`
 - [ ] 0.3 Initialize Prisma: `npx prisma init --datasource-provider postgresql`
 - [ ] 0.4 Configure `prisma/schema.prisma` từ design document
@@ -51,7 +51,7 @@
 
 ## Phase 5: Email Integration
 
-- [x] 5.1 Setup Bull Queue + Redis (hoặc in-memory cho dev)
+- [x] 5.1 Setup direct email sending (hoặc in-memory queue cho dev)
 - [x] 5.2 Configure Resend API key
 - [x] 5.3 Create email templates: project invitation, reminder, selection submitted
 - [x] 5.4 Implement `POST /api/email/send` internal endpoint

@@ -127,7 +127,7 @@ export async function DELETE(
   // 4. Xóa show chụp trong DB (cascade sẽ xóa photos + selections)
   await prisma.project.delete({ where: { id } })
 
-  // 5. Best-effort cleanup AI vectors in backend Redis
+  // 5. Best-effort cleanup AI vectors in backend Qdrant
   try {
     const cleanupResponse = await fetch(buildBackendUrl(`/projects/${id}/vectors`), {
       method: 'DELETE',

@@ -7,7 +7,7 @@ cd frontend
 pnpm install
 
 # Add backend dependencies
-pnpm add prisma @prisma/client next-auth bcryptjs bull ioredis sharp resend @aws-sdk/client-s3 uuid
+pnpm add prisma @prisma/client next-auth bcryptjs sharp resend @aws-sdk/client-s3 uuid
 
 # Add dev dependencies for testing
 pnpm add -D @types/bcryptjs @types/uuid jest ts-jest @types/jest @testing-library/react @testing-library/jest-dom jest-environment-jsdom
@@ -67,5 +67,4 @@ npx prisma generate
 ## Notes
 
 - Storage currently uses local filesystem (`./storage`). Create this directory if needed.
-- Redis is optional —Bull falls back to in-memory if `REDIS_URL` not set.
 - `canvas` package (used by watermark) requires system libraries on Linux. On Windows, `sharp` prebuilt binaries should work.

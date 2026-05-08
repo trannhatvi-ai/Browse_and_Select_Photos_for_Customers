@@ -80,7 +80,7 @@ Build complete backend API with:
 ## Dependencies
 
 - PostgreSQL database accessible
-- Redis (có thể dùng in-memory cho dev)
+- In-memory queue/state storage (không cần dịch vụ ngoài)
 - Resend account (API key)
 - Node.js 20+ (already)
 - `sharp` binary có thể cần build tools (windows: prebuilt binaries)

@@ -26,7 +26,7 @@ export async function POST(
     const indexPayload = {
       project_id: projectId,
       urls: project.photos.map((p) => p.previewUrl),
-      rebuild: true, // Force rebuild to update local Redis
+      rebuild: true, // Force rebuild to update local Qdrant
       project_created_at: project.createdAt.toISOString(),
       project_expires_at: project.deadline.toISOString(),
     }

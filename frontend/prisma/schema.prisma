@@ -99,5 +99,9 @@ model Settings {
   allowSharedCloudinary Boolean @default(true)
   watermarkText   String   @default("PROOFS")
   watermarkOpacity Int     @default(30)
+  vlmProvider     String?  @default("gemini")
+  vlmApiKey       String?
+  vlmApiBase      String?  @default("https://models.inference.ai.azure.com")
+  vlmModelId      String?  @default("gpt-4o-mini")
   updatedAt       DateTime @updatedAt
 }

@@ -58,6 +58,12 @@ export default function SettingsPage() {
   const [globalStats, setGlobalStats] = useState<any>(null)
   const [loadingStats, setLoadingStats] = useState(false)
   const [flushing, setFlushing] = useState(false)
+  const [vlmProvider, setVlmProvider] = useState('gemini')
+  const [vlmApiKey, setVlmApiKey] = useState('')
+  const [vlmApiBase, setVlmApiBase] = useState('https://models.inference.ai.azure.com')
+  const [vlmModelId, setVlmModelId] = useState('gpt-4o-mini')
+  const [activeTasks, setActiveTasks] = useState<any[]>([])
+  const [lastTaskCount, setLastTaskCount] = useState(0)
 
   const fetchGlobalStats = async () => {
     setLoadingStats(true)
@@ -74,12 +80,42 @@ export default function SettingsPage() {
     }
   }
 
+  const fetchActiveTasks = async () => {
+    try {
+      const res = await fetch('/api/ai-stats/admin/tasks/active')
+      if (res.ok) {
+        const tasks = await res.json()
+        setActiveTasks(tasks)
+        
+        // Thông báo khi hoàn thành
+        if (lastTaskCount > 0 && tasks.length === 0) {
+          toast.success('Hệ thống đã hoàn tất tất cả tác vụ xử lý ảnh!')
+          void fetchGlobalStats()
+        }
+        setLastTaskCount(tasks.length)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   // Auto-open Cloudinary guide when redirected from project creation
   useEffect(() => {
     if (userRole === 'ADMIN') {
       void fetchGlobalStats()
+      void fetchActiveTasks()
+      
+      const interval = setInterval(() => {
+        const hasActiveTasks = activeTasks.length > 0 || syncingFull || syncingIncremental;
+        if (hasActiveTasks || (globalStats?.percentage_qdrant ?? 0) < 100) {
+           void fetchGlobalStats()
+           void fetchActiveTasks()
+        }
+      }, 3000)
+      
+      return () => clearInterval(interval)
     }
-  }, [userRole])
+  }, [userRole, activeTasks.length, globalStats?.percentage_qdrant, syncingFull, syncingIncremental])
 
   useEffect(() => {
     if (searchParams.get('setup') === 'cloudinary') {
@@ -99,6 +135,10 @@ export default function SettingsPage() {
         setCloudinaryApiKey(data.cloudinaryApiKey || '')
         setCloudinaryApiSecret(data.cloudinaryApiSecret || '')
         setAllowSharedCloudinary(data.allowSharedCloudinary ?? true)
+        setVlmProvider(data.vlmProvider || 'gemini')
+        setVlmApiKey(data.vlmApiKey || '')
+        setVlmApiBase(data.vlmApiBase || 'https://models.inference.ai.azure.com')
+        setVlmModelId(data.vlmModelId || 'gpt-4o-mini')
         setUserRole(data.userRole || '')
         setLoading(false)
       })
@@ -116,7 +156,10 @@ export default function SettingsPage() {
         cloudinaryCloudName,
         cloudinaryApiKey,
         cloudinaryApiSecret,
-        allowSharedCloudinary
+        vlmProvider,
+        vlmApiKey,
+        vlmApiBase,
+        vlmModelId
       })
     })
 
@@ -144,6 +187,34 @@ export default function SettingsPage() {
     } finally {
       setFlushing(false)
     }
+  }
+
+  const handleSyncMode = async (ctx: string, vec: string) => {
+    if (ctx === 'all' && vec === 'all') setSyncingFull(true)
+    else setSyncingIncremental(true)
+
+    const promise = fetch(`/api/ai-stats/sync/mode?sync_context=${ctx}&sync_vector=${vec}`, { method: 'POST' }).then(async res => {
+      if (!res.ok) {
+        let message = 'Lỗi đồng bộ'
+        try {
+          const data = await res.json()
+          message = data.error || data.detail || message
+        } catch {}
+        throw new Error(message)
+      }
+      return res.json()
+    })
+
+    toast.promise(promise, {
+      loading: `Đang khởi tạo đồng bộ (${ctx}/${vec})...`,
+      success: (data: any) => `Đã bắt đầu xử lý cho ${data.queued_count} show chụp!`,
+      error: (err) => err.message
+    })
+    
+    promise.finally(() => {
+      setSyncingFull(false)
+      setSyncingIncremental(false)
+    })
   }
 
   const handleTestCloudinary = async () => {
@@ -187,6 +258,55 @@ export default function SettingsPage() {
                     onCheckedChange={setAllowSharedCloudinary}
                   />
                 </div>
+                
+                <div className="space-y-4 pt-4 border-t">
+                  <h3 className="text-sm font-semibold text-primary">Cấu hình AI VLM (Trình phân tích ảnh)</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Nguồn AI (Provider)</Label>
+                      <select 
+                        className="w-full h-10 px-3 rounded-md border bg-background text-sm"
+                        value={vlmProvider}
+                        onChange={(e) => setVlmProvider(e.target.value)}
+                      >
+                        <option value="gemini">Google Gemini (Mặc định)</option>
+                        <option value="openai">OpenAI / GitHub Models (GPT-4o mini)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>API Key ({vlmProvider === 'gemini' ? 'Google' : 'GitHub/OpenAI'})</Label>
+                      <Input 
+                        type="password" 
+                        placeholder="Nhập API Key..." 
+                        value={vlmApiKey} 
+                        onChange={(e) => setVlmApiKey(e.target.value)} 
+                      />
+                    </div>
+                    {vlmProvider === 'openai' && (
+                      <>
+                        <div className="space-y-2">
+                          <Label>Model ID</Label>
+                          <Input 
+                            placeholder="gpt-4o-mini" 
+                            value={vlmModelId} 
+                            onChange={(e) => setVlmModelId(e.target.value)} 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>API Base URL</Label>
+                          <Input 
+                            placeholder="https://models.inference.ai.azure.com" 
+                            value={vlmApiBase} 
+                            onChange={(e) => setVlmApiBase(e.target.value)} 
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground italic">
+                    * Nếu bạn dùng GitHub Models, hãy lấy Token tại GitHub Settings và chọn model gpt-4o-mini.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -212,10 +332,10 @@ export default function SettingsPage() {
                    
                    <div className="rounded-xl border bg-emerald-50/50 p-4 space-y-2">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="font-medium text-emerald-700">Redis Indexing</span>
-                        <span className="font-bold">{globalStats?.indexed_photos_redis ?? 0} / {globalStats?.total_photos ?? 0}</span>
+                        <span className="font-medium text-emerald-700">Qdrant Indexing</span>
+                        <span className="font-bold">{globalStats?.indexed_photos_qdrant ?? 0} / {globalStats?.total_photos ?? 0}</span>
                       </div>
-                      <Progress value={globalStats?.percentage_redis ?? 0} className="h-2 bg-emerald-100" />
+                      <Progress value={globalStats?.percentage_qdrant ?? 0} className="h-2 bg-emerald-100" />
                       <p className="text-[10px] text-emerald-600 italic">Tổng ảnh đã sẵn sàng để tìm kiếm (Vector)</p>
                    </div>
                 </div>
@@ -231,100 +351,123 @@ export default function SettingsPage() {
                   Lấy số liệu hệ thống mới nhất
                 </Button>
 
-                <div className="space-y-3 rounded-lg border border-amber-200 bg-background p-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Đồng bộ hoàn toàn (Rebuild tất cả)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Xóa toàn bộ Vector cũ trong Redis và nhúng lại từ đầu bằng Gemini. Dùng khi muốn cập nhật toàn diện dữ liệu AI.
-                    </p>
+                <div className="space-y-6">
+                  {/* Part 1: Full Flow */}
+                  <div className="space-y-3 rounded-lg border border-amber-200 bg-background p-4">
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-amber-700">1. Full luồng (Đồng bộ toàn diện)</p>
+                      <p className="text-xs text-muted-foreground">
+                        Cập nhật thông minh: Đảm bảo tất cả ảnh có ngữ cảnh và đã được đẩy vào Qdrant.
+                      </p>
+                    </div>
+                    <Button 
+                      className="bg-amber-600 hover:bg-amber-700 text-white w-full"
+                      onClick={() => handleSyncMode('missing', 'all')}
+                      disabled={syncingFull || syncingIncremental}
+                    >
+                      {syncingFull ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Bắt đầu đồng bộ tất cả
+                    </Button>
                   </div>
-                  <Button 
-                    className="bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto"
-                    onClick={() => {
-                      setSyncingFull(true)
-                      const promise = fetch('/api/ai-stats/sync/all', { method: 'POST' }).then(async res => {
-                        if (!res.ok) {
-                          let message = 'Lỗi đồng bộ'
-                          try {
-                            const data = await res.json()
-                            message = data.error || data.detail || message
-                          } catch {}
-                          throw new Error(message)
-                        }
-                        return res.json()
-                      })
 
-                      toast.promise(promise, {
-                        loading: 'Đang bắt đầu đồng bộ toàn bộ...',
-                        success: (data: any) => `Đã bắt đầu cho ${data.queued_count} show chụp!`,
-                        error: (err) => err.message
-                      })
-                      promise.finally(() => setSyncingFull(false))
-                    }}
-                    disabled={syncingFull || syncingIncremental}
-                  >
-                    {syncingFull ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Bắt đầu ngay
-                  </Button>
+                  {/* Part 2: Database Context */}
+                  <div className="space-y-3 rounded-lg border border-blue-200 bg-background p-4">
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-blue-700">2. Database Context (Phân tích Gemini)</p>
+                      <p className="text-xs text-muted-foreground">Chỉ tác động đến dữ liệu mô tả ảnh trong Postgres.</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-blue-200 hover:bg-blue-50"
+                        onClick={() => handleSyncMode('all', 'none')}
+                        disabled={syncingFull || syncingIncremental}
+                      >
+                        Toàn bộ (Rebuild)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-blue-200 hover:bg-blue-50"
+                        onClick={() => handleSyncMode('missing', 'none')}
+                        disabled={syncingFull || syncingIncremental}
+                      >
+                        Cập nhật bổ sung
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Part 3: Qdrant Vector */}
+                  <div className="space-y-3 rounded-lg border border-emerald-200 bg-background p-4">
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-emerald-700">3. Qdrant Vector Store (Tìm kiếm AI)</p>
+                      <p className="text-xs text-muted-foreground">Đẩy dữ liệu từ Postgres vào bộ nhớ Vector (Qdrant).</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-emerald-200 hover:bg-emerald-50"
+                        onClick={() => handleSyncMode('none', 'all')}
+                        disabled={syncingFull || syncingIncremental}
+                      >
+                        Toàn bộ (Embed all)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-emerald-200 hover:bg-emerald-50"
+                        onClick={() => handleSyncMode('none', 'missing')}
+                        disabled={syncingFull || syncingIncremental}
+                      >
+                        Cập nhật bổ sung
+                      </Button>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-3 rounded-lg border border-blue-200 bg-background p-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Ưu tiên embed (Chỉ nhúng ảnh mới)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Chỉ gửi những ảnh chưa có ngữ cảnh tới Gemini. Tiết kiệm chi phí và thời gian.
-                    </p>
+                {/* Task Monitor */}
+                {activeTasks.length > 0 && (
+                  <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4 animate-in fade-in slide-in-from-top-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-primary flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Đang xử lý {activeTasks.length} tác vụ...
+                      </p>
+                    </div>
+                    <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
+                      {activeTasks.map((task: any) => (
+                        <div key={task.task_id} className="space-y-1.5">
+                          <div className="flex justify-between text-[10px]">
+                            <span className="font-medium truncate max-w-[200px]">Project: {task.task_id.replace('index:', '')}</span>
+                            <span className="font-bold">{task.percentage}% ({task.processed_count}/{task.total_count})</span>
+                          </div>
+                          <Progress value={task.percentage} className="h-1" />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="border-blue-200 hover:bg-blue-100 text-blue-700 w-full sm:w-auto"
-                    onClick={() => {
-                      setSyncingIncremental(true)
-                      const promise = fetch('/api/ai-stats/sync/incremental', { method: 'POST' }).then(async res => {
-                        if (!res.ok) {
-                          let message = 'Lỗi đồng bộ'
-                          try {
-                            const data = await res.json()
-                            message = data.error || data.detail || message
-                          } catch {}
-                          throw new Error(message)
-                        }
-                        return res.json()
-                      })
-
-                      toast.promise(promise, {
-                        loading: 'Đang chuẩn bị đồng bộ bổ sung...',
-                        success: (data: any) => `Đã bắt đầu xử lý cho ${data.queued_count} show chụp!`,
-                        error: (err) => err.message
-                      })
-                      promise.finally(() => setSyncingIncremental(false))
-                    }}
-                    disabled={syncingFull || syncingIncremental}
-                  >
-                    {syncingIncremental ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Ưu tiên embed
-                  </Button>
-                </div>
+                )}
 
                 <div className="pt-4 mt-4 border-t border-amber-200">
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button 
                         variant="ghost" 
+                        size="sm"
                         className="text-destructive hover:text-destructive hover:bg-destructive/10 w-full justify-start gap-2"
                         disabled={flushing || syncingFull || syncingIncremental}
                       >
                         {flushing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        Xóa sạch bộ nhớ Vector AI (Redis)
+                        Xóa sạch bộ nhớ Vector AI (Qdrant)
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Bạn có chắc chắn muốn xóa sạch?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Hành động này sẽ xóa TOÀN BỘ các vector tìm kiếm trong Redis (Upstash). 
-                          Các show chụp sẽ không thể tìm kiếm AI cho đến khi bạn nhấn đồng bộ lại.
-                          Dữ liệu mô tả ảnh trong Postgres vẫn được giữ nguyên.
+                          Hành động này sẽ xóa TOÀN BỘ các vector tìm kiếm trong Qdrant. Dữ liệu trong Postgres vẫn giữ nguyên.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

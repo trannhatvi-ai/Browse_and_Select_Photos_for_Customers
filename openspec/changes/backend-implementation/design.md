@@ -8,7 +8,7 @@
 - Storage: Local filesystem (development), S3-compatible (production)
 - Auth: NextAuth.js (credentials provider cho admin)
 - Email: Resend (transactional email API)
-- Queue: Bull Queue (Redis) cho async email sending
+- Queue: direct email sending hoặc in-memory queue cho async email sending
 
 **Database Schema (Prisma)**
 
@@ -128,7 +128,7 @@ app/api/
 - **Session**: HTTP-only cookies cho admin, localStorage token cho client (optional)
 
 ### 4. Email Sending
-- **Async queue**: Bull + Redis
+- **Async queue**: direct send hoặc in-memory queue
 - **Provider**: Resend (free tier đủ cho dev)
 - **Templates**: React Email hoặc simple HTML strings
 
@@ -158,7 +158,7 @@ frontend/
 - **Environment**: Vercel (serverless) hoặc self-hosted VPS
 - **Database**: Neon (PostgreSQL serverless) hoặc Supabase
 - **Storage**: Cloudflare R2 (S3-compatible, cheap) hoặc AWS S3
-- **Redis**: Upstash Redis cho Bull queue
+- **Queue backend**: none hoặc in-memory queue
 
 ## Open Questions
 
