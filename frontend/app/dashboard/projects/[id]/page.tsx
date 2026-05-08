@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils'
 import { StudioLightbox } from '@/components/studio-lightbox'
 import { AIInsightSheet } from '@/components/ai-insight-sheet'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { ProjectDetailsSkeleton } from '@/components/skeletons'
 
 type PhotoItem = {
   id: string
@@ -333,14 +334,7 @@ export default function ProjectDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center px-4">
-        <div className="flex items-center gap-3 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Đang tải show chụp...
-        </div>
-      </div>
-    )
+    return <ProjectDetailsSkeleton />
   }
 
   if (!project) {

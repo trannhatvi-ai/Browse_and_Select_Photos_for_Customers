@@ -3,15 +3,19 @@
 import { useState, useEffect } from 'react'
 import { ProjectsTable } from '@/components/projects-table'
 import { NewProjectSheetButton } from '@/components/new-project-sheet-button'
+import { TableSkeleton } from '@/components/skeletons'
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   const fetchProjects = () => {
+    setLoading(true)
     fetch('/api/projects')
       .then(res => res.ok ? res.json() : [])
       .then(data => setProjects(Array.isArray(data) ? data : []))
       .catch(() => setProjects([]))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
@@ -30,7 +34,11 @@ export default function ProjectsPage() {
         <NewProjectSheetButton className="shrink-0" />
       </div>
 
-      <ProjectsTable projects={projects} onRefresh={fetchProjects} />
+      {loading ? (
+        <TableSkeleton />
+      ) : (
+        <ProjectsTable projects={projects} onRefresh={fetchProjects} />
+      )}
     </div>
   )
 }

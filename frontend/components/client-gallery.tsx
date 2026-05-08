@@ -40,6 +40,7 @@ import { ComparisonViewer } from '@/components/comparison-viewer'
 import { getCloudinaryThumbnail } from '@/lib/cloudinary'
 import { cn } from '@/lib/utils'
 import type { Photo } from '@/lib/types'
+import { GallerySkeleton } from './skeletons'
 
 type FilterType = 'all' | 'selected' | 'unselected' | 'smart'
 type SortType = 'date' | 'filename'
@@ -559,25 +560,7 @@ export function ClientGallery({ token }: { token?: string }) {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-40 border-b border-border bg-card/95 p-4">
-          <div className="mx-auto max-w-7xl">
-            <div className="h-6 w-48 rounded bg-muted animate-pulse" />
-          </div>
-        </header>
-        <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className="mb-4">
-            <div className="h-8 w-64 rounded bg-muted animate-pulse" />
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="aspect-[4/3] rounded-lg bg-muted animate-pulse" />
-            ))}
-          </div>
-        </div>
-      </div>
-    )
+    return <GallerySkeleton />
   }
 
   return (
