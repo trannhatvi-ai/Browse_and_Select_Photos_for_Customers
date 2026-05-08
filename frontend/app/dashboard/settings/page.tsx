@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { ExternalLink, Save, Loader2, FlaskConical, Info, XIcon } from 'lucide-react'
+import { ExternalLink, Save, Loader2, FlaskConical, Info, XIcon, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -18,6 +18,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 class SyncAIError extends Error {
   status?: number
@@ -46,6 +57,7 @@ export default function SettingsPage() {
   const [userRole, setUserRole] = useState('')
   const [globalStats, setGlobalStats] = useState<any>(null)
   const [loadingStats, setLoadingStats] = useState(false)
+  const [flushing, setFlushing] = useState(false)
 
   const fetchGlobalStats = async () => {
     setLoadingStats(true)
@@ -114,6 +126,24 @@ export default function SettingsPage() {
       toast.error('Lỗi khi lưu cài đặt!')
     }
     setSaving(false)
+  }
+  
+  const handleFlushVectors = async () => {
+    setFlushing(true)
+    try {
+      const res = await fetch('/api/ai-stats/admin/vectors/flush', { method: 'DELETE' })
+      if (res.ok) {
+        toast.success('Đã xóa sạch bộ nhớ Vector AI!')
+        void fetchGlobalStats() // Refresh stats
+      } else {
+        const data = await res.json()
+        toast.error(data.error || 'Lỗi khi xóa vector')
+      }
+    } catch (e) {
+      toast.error('Lỗi kết nối server')
+    } finally {
+      setFlushing(false)
+    }
   }
 
   const handleTestCloudinary = async () => {
@@ -274,6 +304,40 @@ export default function SettingsPage() {
                     {syncingIncremental ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Ưu tiên embed
                   </Button>
+                </div>
+
+                <div className="pt-4 mt-4 border-t border-amber-200">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 w-full justify-start gap-2"
+                        disabled={flushing || syncingFull || syncingIncremental}
+                      >
+                        {flushing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        Xóa sạch bộ nhớ Vector AI (Redis)
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Bạn có chắc chắn muốn xóa sạch?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Hành động này sẽ xóa TOÀN BỘ các vector tìm kiếm trong Redis (Upstash). 
+                          Các show chụp sẽ không thể tìm kiếm AI cho đến khi bạn nhấn đồng bộ lại.
+                          Dữ liệu mô tả ảnh trong Postgres vẫn được giữ nguyên.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Hủy</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleFlushVectors}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Xác nhận xóa sạch
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
