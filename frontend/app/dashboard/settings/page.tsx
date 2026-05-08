@@ -82,7 +82,7 @@ export default function SettingsPage() {
         allowSharedCloudinary
       })
     })
-    
+
     if (res.ok) {
       toast.success('Đã lưu cài đặt thành công!')
     } else {
@@ -106,7 +106,7 @@ export default function SettingsPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Cài đặt hệ thống</h1>
-      
+
       <div className="grid gap-6">
         {userRole === 'ADMIN' && (
           <>
@@ -122,7 +122,7 @@ export default function SettingsPage() {
                   <div className="space-y-0.5">
                     <Label htmlFor="shared-cloudinary">Cho phép dùng chung Cloudinary của Admin</Label>
                     <p className="text-xs text-muted-foreground">
-                      Nếu bật, các studio chưa có cấu hình riêng sẽ dùng chung tài khoản Cloudinary của Admin. 
+                      Nếu bật, các studio chưa có cấu hình riêng sẽ dùng chung tài khoản Cloudinary của Admin.
                       Nếu tắt, họ bắt buộc phải cấu hình tài khoản riêng mới có thể tạo show chụp mới.
                     </p>
                   </div>
@@ -157,7 +157,7 @@ export default function SettingsPage() {
                     className="border-amber-200 hover:bg-amber-100 text-amber-700 w-full sm:w-auto"
                     onClick={async () => {
                       if (!confirm('Bạn có chắc chắn muốn đồng bộ hoàn toàn? Tất cả ảnh sẽ được gửi cho Gemini lại. Việc này có thể mất vài phút tùy lượng ảnh.')) return
-                      
+
                       setSyncingFull(true)
                       toast.promise(
                         fetch('/api/admin/sync-ai?fullRebuild=true', { method: 'POST' }).then(async res => {
@@ -175,7 +175,7 @@ export default function SettingsPage() {
                         }),
                         {
                           loading: 'Đang bắt đầu tiến trình đồng bộ hoàn toàn...',
-                          success: (data) => `Đã bắt đầu đồng bộ hoàn toàn cho ${data.queued_count} dự án!`,
+                          success: (data) => `Đã bắt đầu đồng bộ hoàn toàn cho ${data.queued_count} show!`,
                           error: (error) => {
                             if (error instanceof SyncAIError) {
                               if (error.status) {
@@ -208,7 +208,7 @@ export default function SettingsPage() {
                     className="border-blue-200 hover:bg-blue-100 text-blue-700 w-full sm:w-auto"
                     onClick={async () => {
                       if (!confirm('Bạn có chắc chắn muốn ưu tiên embed? Chỉ những ảnh chưa có ngữ cảnh từ Gemini sẽ được xử lý. Tiến trình này sẽ nhanh hơn.')) return
-                      
+
                       setSyncingIncremental(true)
                       toast.promise(
                         fetch('/api/admin/sync-ai?fullRebuild=false', { method: 'POST' }).then(async res => {
@@ -226,7 +226,7 @@ export default function SettingsPage() {
                         }),
                         {
                           loading: 'Đang bắt đầu tiến trình ưu tiên embed...',
-                          success: (data) => `Đã bắt đầu ưu tiên embed cho ${data.queued_count} dự án!`,
+                          success: (data) => `Đã bắt đầu ưu tiên embed cho ${data.queued_count} show!`,
                           error: (error) => {
                             if (error instanceof SyncAIError) {
                               if (error.status) {

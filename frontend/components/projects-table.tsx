@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, MoreHorizontal, Download, Link as LinkIcon, Upload, Image as ImageIcon, Trash2, ArrowUpDown, Search, SlidersHorizontal, Loader2 } from 'lucide-react'
+import { Eye, MoreHorizontal, Download, Link as LinkIcon, Upload, Image as ImageIcon, Trash2, ArrowUpDown, Search, SlidersHorizontal, Loader2, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -285,6 +285,17 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
+                          variant="outline" size="icon" className="h-8 w-8 text-sky-600 hover:text-sky-700 hover:bg-sky-50 border-sky-200"
+                          title="Mở link gallery"
+                          onClick={() => {
+                            if (!project.accessToken) return
+                            const url = `${window.location.origin}/gallery/${project.accessToken}`
+                            window.open(url, '_blank')
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                        <Button
                           variant="outline" size="icon" className="h-8 w-8"
                           title="Copy link gửi khách"
                           onClick={() => {
@@ -389,6 +400,19 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                     onClick={() => handleViewProject(project.id)}
                   >
                     <Eye className="mr-1 h-4 w-4" /> Xem
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-11 px-3 text-sm text-sky-600 border-sky-200"
+                    title="Mở link gallery"
+                    onClick={() => {
+                      if (!project.accessToken) return toast.error('Không có link show chụp')
+                      const url = `${window.location.origin}/gallery/${project.accessToken}`
+                      window.open(url, '_blank')
+                    }}
+                  >
+                    <ExternalLink className="mr-1 h-4 w-4" /> Mở
                   </Button>
                   <Button
                     variant="outline"

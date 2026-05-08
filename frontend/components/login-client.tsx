@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Lock, Mail, Eye, EyeOff } from 'lucide-react'
+import { ArrowRight, Lock, Mail, Eye, EyeOff, Sparkles } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -278,9 +279,102 @@ export default function LoginClient() {
           </Tabs>
         </div>
 
-        <div className="hidden lg:block">
-          {/* Right side static illustration or info could go here */}
+        <div className="hidden lg:flex flex-col h-full rounded-3xl bg-white overflow-hidden relative group border border-slate-200">
+          {/* Showcase background with infinite scroll - Light Theme */}
+          <div className="absolute inset-0 z-0">
+             <ShowcaseCarousel token="zehgnjymsk" />
+             <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent" />
+          </div>
+
+          <div className="relative z-10 mt-auto p-12 text-slate-900">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-slate-900/5 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 backdrop-blur-xl border border-slate-200/50 shadow-sm">
+              <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
+              <span>Giao diện thực tế: zehgnjymsk</span>
+            </div>
+            
+            <h2 className="mb-6 text-5xl font-extrabold leading-[1.05] tracking-tight text-slate-900">
+              Trải nghiệm <br />
+              <span className="text-primary italic font-serif">chọn ảnh</span> đỉnh cao
+            </h2>
+            
+            <p className="mb-10 text-lg text-slate-500 max-w-sm leading-relaxed font-light">
+              Tối ưu hóa quy trình làm việc của Studio. Mang đến cho khách hàng của bạn một không gian chọn ảnh sang trọng và hiện đại.
+            </p>
+
+            <div className="flex flex-col gap-6">
+              <Button 
+                onClick={() => window.open('/gallery/zehgnjymsk', '_blank')}
+                className="w-fit h-14 px-10 rounded-full bg-slate-900 text-white hover:bg-slate-800 font-bold gap-3 transition-all active:scale-95 shadow-xl group/btn"
+              >
+                <Eye className="h-5 w-5 transition-transform group-hover/btn:scale-110" /> Khám phá Gallery Demo
+              </Button>
+              
+              <div className="grid grid-cols-2 gap-10 border-t border-slate-100 pt-10 mt-2">
+                <div className="space-y-1">
+                  <div className="text-3xl font-black text-slate-900">10k+</div>
+                  <div className="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">Ảnh đã xử lý</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-3xl font-black text-slate-900">99%</div>
+                  <div className="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">Hài lòng</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ShowcaseCarousel({ token }: { token: string }) {
+  const [photos, setPhotos] = useState<any[]>([])
+  
+  useEffect(() => {
+    fetch(`/api/gallery/${token}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.photos) {
+          setPhotos([...data.photos, ...data.photos])
+        }
+      })
+      .catch(console.error)
+  }, [token])
+
+  if (photos.length === 0) return <div className="h-full w-full bg-slate-50 animate-pulse" />
+
+  const col1 = photos.slice(0, Math.ceil(photos.length / 2))
+  const col2 = photos.slice(Math.ceil(photos.length / 2))
+
+  return (
+    <div className="flex h-full gap-4 p-6 opacity-60 overflow-hidden">
+      <style>{`
+        @keyframes scroll-y {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(-50%); }
+        }
+        .animate-scroll-y {
+          animation: scroll-y 60s linear infinite;
+        }
+        .animate-scroll-y-reverse {
+          animation: scroll-y 75s linear infinite reverse;
+        }
+      `}</style>
+      
+      <div className="flex-1 flex flex-col gap-4 animate-scroll-y">
+        {col1.map((p, i) => (
+          <div key={`${p.id}-${i}`} className="relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded-3xl shadow-sm border border-slate-100">
+            <img src={p.previewUrl} className="h-full w-full object-cover" alt="" />
+          </div>
+        ))}
+      </div>
+      
+      <div className="flex-1 flex flex-col gap-4 animate-scroll-y-reverse">
+        {col2.map((p, i) => (
+          <div key={`${p.id}-${i}`} className="relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded-3xl shadow-sm border border-slate-100">
+            <img src={p.previewUrl} className="h-full w-full object-cover" alt="" />
+          </div>
+        ))}
       </div>
     </div>
   )

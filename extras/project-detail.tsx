@@ -109,7 +109,7 @@ export function ProjectDetail({ project, photos: initialPhotos }: ProjectDetailP
             <BreadcrumbList>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link href="/dashboard/projects">Dự án</Link>
+                  <Link href="/dashboard/projects">Show</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator>
@@ -182,7 +182,7 @@ export function ProjectDetail({ project, photos: initialPhotos }: ProjectDetailP
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base font-medium flex items-center gap-2">
                   <Settings className="h-4 w-4" />
-                  Cấu hình dự án
+                  Cấu hình show
                 </CardTitle>
                 <ChevronDown
                   className={`h-4 w-4 text-muted-foreground transition-transform ${
@@ -233,7 +233,7 @@ export function ProjectDetail({ project, photos: initialPhotos }: ProjectDetailP
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium text-foreground">
-            Ảnh trong dự án ({photos.length})
+            Ảnh trong show ({photos.length})
           </h2>
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />

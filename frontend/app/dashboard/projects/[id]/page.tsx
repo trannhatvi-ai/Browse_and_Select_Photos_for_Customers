@@ -214,7 +214,7 @@ export default function ProjectDetailPage() {
         throw new Error(payload?.error || 'Không thể cập nhật cấu hình')
       }
 
-      toast.success('Đã cập nhật cấu hình dự án!')
+      toast.success('Đã cập nhật cấu hình show!')
       await fetchDetails()
       setConfigOpen(false)
     } catch (error) {
@@ -451,7 +451,7 @@ export default function ProjectDetailPage() {
         <aside className="hidden lg:block">
           <div className="sticky top-24 space-y-6">
             <div className="space-y-1 px-1">
-              <h2 className="text-lg font-bold tracking-tight">Cấu hình dự án</h2>
+              <h2 className="text-lg font-bold tracking-tight">Cấu hình</h2>
               <p className="text-xs text-muted-foreground">Thiết lập các thông số cho show chụp.</p>
             </div>
 
@@ -462,7 +462,7 @@ export default function ProjectDetailPage() {
                     <Settings2 className="h-4 w-4 text-primary" />
                     Thông tin show chụp
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Cập nhật thông tin cơ bản và trạng thái dự án.</p>
+                  <p className="text-[10px] text-muted-foreground">Cập nhật thông tin cơ bản và trạng thái show.</p>
                 </div>
                 
                 <div className="grid gap-4">
@@ -564,7 +564,7 @@ export default function ProjectDetailPage() {
                 Cấu hình show chụp
               </SheetTitle>
               <SheetDescription>
-                Điều chỉnh các thiết lập cho dự án này.
+                Điều chỉnh các thiết lập cho show này.
               </SheetDescription>
             </SheetHeader>
 
