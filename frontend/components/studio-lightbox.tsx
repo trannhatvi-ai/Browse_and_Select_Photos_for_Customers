@@ -55,12 +55,40 @@ export function StudioLightbox({
     setIsZoomed(false)
   }, [currentIndex])
 
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > 50
+    const isRightSwipe = distance < -50
+    
+    if (isLeftSwipe && currentIndex < photos.length - 1) {
+      onNavigate(currentIndex + 1)
+    } else if (isRightSwipe && currentIndex > 0) {
+      onNavigate(currentIndex - 1)
+    }
+  }
+
   if (!isOpen || !currentPhoto) return null
 
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95"
       onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Close button */}
       <button
