@@ -1,36 +1,54 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getCloudinaryCredentialsForUser, validateUserCloudinarySettings } from '@/lib/cloudinary-settings'
 import { v2 as cloudinary } from 'cloudinary'
 
-export async function POST() {
+function normalizeCredential(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const settings = await prisma.settings.findUnique({
-    where: { userId: session.user.id },
-    select: {
-      cloudinaryCloudName: true,
-      cloudinaryApiKey: true,
-      cloudinaryApiSecret: true,
-    },
-  })
+  let body: any = {}
+  try {
+    body = await req.json()
+  } catch {}
 
-  const cloudName = settings?.cloudinaryCloudName || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-  const apiKey = settings?.cloudinaryApiKey || process.env.CLOUDINARY_API_KEY
-  const apiSecret = settings?.cloudinaryApiSecret || process.env.CLOUDINARY_API_SECRET
+  const submittedCredentials = {
+    cloud_name: normalizeCredential(body.cloudinaryCloudName),
+    api_key: normalizeCredential(body.cloudinaryApiKey),
+    api_secret: normalizeCredential(body.cloudinaryApiSecret),
+  }
 
-  if (!cloudName || !apiKey || !apiSecret) {
-    return NextResponse.json({ error: 'Vui lòng nhập đủ cloud name, api key và api secret' }, { status: 400 })
+  const submittedValues = Object.values(submittedCredentials)
+  const hasSubmittedAnyCredential = submittedValues.some(Boolean)
+  const hasSubmittedAllCredentials = submittedValues.every(Boolean)
+
+  if (hasSubmittedAnyCredential && !hasSubmittedAllCredentials) {
+    return NextResponse.json({ error: 'Vui lòng nhập đủ Cloud Name, API Key và API Secret trước khi test' }, { status: 400 })
+  }
+
+  let credentials = submittedCredentials
+  if (!hasSubmittedAnyCredential) {
+    const { isConfigured, missing } = await validateUserCloudinarySettings(session.user.id)
+    if (!isConfigured) {
+      return NextResponse.json(
+        { error: `Cloudinary chưa được cấu hình. Thiếu: ${missing?.join(', ') || 'Cloudinary credentials'}` },
+        { status: 400 }
+      )
+    }
+    credentials = await getCloudinaryCredentialsForUser(session.user.id)
   }
 
   cloudinary.config({
-    cloud_name: cloudName,
-    api_key: apiKey,
-    api_secret: apiSecret,
+    cloud_name: credentials.cloud_name,
+    api_key: credentials.api_key,
+    api_secret: credentials.api_secret,
   })
 
   try {

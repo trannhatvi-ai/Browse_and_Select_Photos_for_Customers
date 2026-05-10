@@ -21,6 +21,8 @@ model User {
   passwordResetToken      String?
   passwordResetExpires     DateTime?
   projects     Project[]
+  schedules    ShootSchedule[]
+  notificationLogs NotificationLog[]
   settings     Settings?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -42,6 +44,7 @@ model Project {
   createdByUser   User        @relation(fields: [createdBy], references: [id])
   photos          Photo[]
   selections      Selection[]
+  schedules       ShootSchedule[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 }
@@ -86,6 +89,14 @@ enum ProjectStatus {
   DONE        // Selection submitted, hoàn thành
 }
 
+enum ScheduleStatus {
+  PLANNED
+  CONFIRMED
+  SHOOTING
+  COMPLETED
+  CANCELLED
+}
+
 model Settings {
   id              String   @id @default(cuid())
   userId          String   @unique
@@ -103,5 +114,52 @@ model Settings {
   vlmApiKey       String?
   vlmApiBase      String?  @default("https://models.inference.ai.azure.com")
   vlmModelId      String?  @default("gpt-4o-mini")
+  totalVectorsQdrant Int?
+  notificationConfig Json?
+  adminIntegrationConfig Json?
   updatedAt       DateTime @updatedAt
+}
+
+model ShootSchedule {
+  id                   String         @id @default(cuid())
+  userId               String
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId            String?
+  project              Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  title                String
+  clientName           String?
+  clientEmail          String?
+  location             String?
+  notes                String?
+  startAt              DateTime
+  endAt                DateTime?
+  reminderAt           DateTime?
+  reminderSentAt       DateTime?
+  notificationChannels Json?
+  status               ScheduleStatus @default(PLANNED)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  notificationLogs     NotificationLog[]
+
+  @@index([userId, startAt])
+  @@index([userId, reminderAt])
+  @@index([projectId])
+}
+
+model NotificationLog {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduleId  String?
+  schedule    ShootSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  channel     String
+  target      String?
+  status      String
+  subject     String?
+  message     String
+  error       String?
+  createdAt   DateTime       @default(now())
+
+  @@index([userId, createdAt])
+  @@index([scheduleId])
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Check, CheckCircle2, ChevronDown, Copy, ImageIcon, LayoutGrid, Loader2, Maximize2, MousePointer2, Plus, RefreshCw, Save, Settings2, Sparkles, Square, CheckSquare, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, Check, CheckCircle2, ChevronDown, Copy, ImageIcon, LayoutGrid, Link as LinkIcon, Loader2, Maximize2, MousePointer2, Plus, RefreshCw, Save, Settings2, Sparkles, Square, CheckSquare, Trash2, Upload, X } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -17,6 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +70,14 @@ type ProjectDetails = {
   photos: PhotoItem[]
 }
 
+type DriveImportItem = {
+  id: string
+  name: string
+  progress: number
+  status: 'pending' | 'downloading' | 'uploading' | 'complete' | 'error'
+  message?: string
+}
+
 function getStatusLabel(status: ProjectDetails['status']) {
   return status === 'DONE' ? 'Hoàn thành' : 'Khách đang chọn'
 }
@@ -94,6 +111,10 @@ export default function ProjectDetailPage() {
   const [deletingPhoto, setDeletingPhoto] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<Array<{ id: string; name: string; progress: number; status: string }>>([])
   const [isUploading, setIsUploading] = useState(false)
+  const [driveImportOpen, setDriveImportOpen] = useState(false)
+  const [driveLinks, setDriveLinks] = useState('')
+  const [driveImportItems, setDriveImportItems] = useState<DriveImportItem[]>([])
+  const [isImportingDrive, setIsImportingDrive] = useState(false)
   const [aiStats, setAiStats] = useState<{
     total_photos: number
     context_photos_db: number
@@ -179,11 +200,18 @@ export default function ProjectDetailPage() {
   const photoCount = photos.length
   const aiContextCount = photos.filter((photo) => photo.aiContext && typeof photo.aiContext === 'object').length
 
+  const transferItems = useMemo(
+    () => [...uploadFiles, ...driveImportItems],
+    [driveImportItems, uploadFiles]
+  )
+
   const overallProgress = useMemo(() => {
-    if (uploadFiles.length === 0) return 0
-    const total = uploadFiles.reduce((acc, file) => acc + file.progress, 0)
-    return Math.round(total / uploadFiles.length)
-  }, [uploadFiles])
+    if (transferItems.length === 0) return 0
+    const total = transferItems.reduce((acc, file) => acc + file.progress, 0)
+    return Math.round(total / transferItems.length)
+  }, [transferItems])
+
+  const transferInProgress = isUploading || isImportingDrive
 
   const allIndexed = useMemo(() => {
     if (!aiStats) return false
@@ -388,6 +416,151 @@ export default function ProjectDetailPage() {
     }, 3000)
   }
 
+  const upsertDriveImportItem = (id: string, patch: Partial<DriveImportItem>) => {
+    setDriveImportItems(prev => {
+      const existing = prev.find(item => item.id === id)
+      if (!existing) {
+        return [
+          ...prev,
+          {
+            id,
+            name: patch.name || 'Google Drive image',
+            progress: patch.progress ?? 0,
+            status: patch.status || 'pending',
+            message: patch.message,
+          },
+        ]
+      }
+
+      return prev.map(item => item.id === id ? { ...item, ...patch } : item)
+    })
+  }
+
+  const handleImportDriveLinks = async () => {
+    if (!project) return
+
+    const urls = driveLinks
+      .split(/\s+/)
+      .map(link => link.trim())
+      .filter(Boolean)
+
+    if (urls.length === 0) {
+      toast.error('Vui lòng dán ít nhất một link Google Drive.')
+      return
+    }
+
+    setIsImportingDrive(true)
+    setDriveImportItems(urls.map((url, index) => ({
+      id: `link-${index}`,
+      name: url,
+      progress: 5,
+      status: 'pending',
+      message: 'Đang chuẩn bị đọc link...',
+    })))
+
+    let uploaded = 0
+    let failed = 0
+
+    try {
+      const res = await fetch(`/api/projects/${project.id}/photos/google-drive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls }),
+      })
+
+      if (!res.body) {
+        const payload = await res.json().catch(() => null)
+        throw new Error(payload?.error || 'Không thể bắt đầu tải ảnh từ Google Drive.')
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const event = JSON.parse(line)
+
+          if (event.type === 'queued') {
+            setDriveImportItems(event.items.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              progress: 10,
+              status: 'pending',
+              message: 'Đã nhận link, chờ tải ảnh...',
+            })))
+          }
+
+          if (event.type === 'item-start') {
+            upsertDriveImportItem(event.id, {
+              name: event.name,
+              progress: 30,
+              status: 'downloading',
+              message: event.message,
+            })
+          }
+
+          if (event.type === 'item-uploading') {
+            upsertDriveImportItem(event.id, {
+              progress: 70,
+              status: 'uploading',
+              message: event.message,
+            })
+          }
+
+          if (event.type === 'item-complete') {
+            upsertDriveImportItem(event.id, {
+              name: event.name,
+              progress: 100,
+              status: 'complete',
+              message: 'Đã tải lên Cloudinary.',
+            })
+          }
+
+          if (event.type === 'item-error') {
+            upsertDriveImportItem(event.id, {
+              name: event.name,
+              progress: 100,
+              status: 'error',
+              message: event.message,
+            })
+          }
+
+          if (event.type === 'done') {
+            uploaded = event.uploaded || 0
+            failed = event.failed || 0
+          }
+
+          if (event.type === 'error') {
+            throw new Error(event.message)
+          }
+        }
+      }
+
+      if (uploaded > 0) {
+        await fetchDetails()
+        toast.success(`Đã tải ${uploaded} ảnh từ Google Drive!`)
+        setDriveLinks('')
+      }
+
+      if (failed > 0) {
+        toast.error(`${failed} link Google Drive không tải được. Vui lòng kiểm tra quyền truy cập.`)
+      }
+    } catch (error) {
+      toast.error((error as Error).message || 'Không thể tải ảnh từ Google Drive.')
+    } finally {
+      setIsImportingDrive(false)
+    }
+  }
+
   if (loading) {
     return <ProjectDetailsSkeleton />
   }
@@ -405,7 +578,7 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-0 pb-36 sm:px-6 lg:px-8">
-      {isUploading && (
+      {transferInProgress && (
         <div className="fixed top-0 left-0 right-0 z-[100] h-1 bg-muted/30">
           <div
             className="h-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)] transition-all duration-300 ease-out"
@@ -505,6 +678,15 @@ export default function ProjectDetailPage() {
                 onChange={(e) => handleUploadFiles(e.target.files)}
               />
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2 sm:h-10"
+              onClick={() => setDriveImportOpen(true)}
+            >
+              <LinkIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Google Drive</span>
+            </Button>
             <Button variant="outline" size="sm" className="h-9 gap-2 sm:h-10 sm:px-4" onClick={() => setConfigOpen(true)}>
               <Settings2 className="h-4 w-4" />
               <span className="hidden sm:inline">Cấu hình</span>
@@ -536,7 +718,7 @@ export default function ProjectDetailPage() {
                 }}
               >
                 <img
-                  src={photo.previewUrl || photo.url}
+                  src={photo.previewUrl || photo.url || ''}
                   alt={photo.filename}
                   className={cn(
                     "h-full w-full object-cover transition-transform duration-500",
@@ -564,7 +746,7 @@ export default function ProjectDetailPage() {
                 )}
 
                 {!isSelectionMode && (
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-100 transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">
                     <div className="absolute right-2 top-2">
                       <button
                         onClick={(e) => {
@@ -726,16 +908,27 @@ export default function ProjectDetailPage() {
                       onChange={(e) => handleUploadFiles(e.target.files)}
                     />
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full h-16 flex-col gap-1 rounded-2xl border-dashed border-2 bg-background/70 shadow-sm"
+                    onClick={() => setDriveImportOpen(true)}
+                  >
+                    <LinkIcon className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-xs font-medium">Tải ảnh từ link Google Drive</span>
+                  </Button>
 
-                  {uploadFiles.length > 0 && (
+                  {transferItems.length > 0 && (
                     <div className="space-y-2">
-                      {uploadFiles.map(file => (
+                      {transferItems.map(file => (
                         <div key={file.id} className="text-xs space-y-1.5 p-3 rounded-xl bg-background border shadow-sm">
                           <div className="flex justify-between gap-2">
                             <span className="truncate font-medium">{file.name}</span>
                             <span className="text-muted-foreground">{file.status === 'complete' ? 'Thành công' : `${file.progress}%`}</span>
                           </div>
                           <Progress value={file.progress} className="h-1.5" />
+                          {'message' in file && (file as DriveImportItem).message ? (
+                            <p className="text-[10px] leading-relaxed text-muted-foreground">{(file as DriveImportItem).message}</p>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -750,6 +943,79 @@ export default function ProjectDetailPage() {
             </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={driveImportOpen} onOpenChange={(open) => !isImportingDrive && setDriveImportOpen(open)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader className="space-y-2 text-left">
+            <DialogTitle>Tải ảnh từ Google Drive</DialogTitle>
+            <DialogDescription>
+              Dán một hoặc nhiều link ảnh Google Drive. Link cần được bật quyền “Anyone with the link can view” để hệ thống tải được ảnh.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Textarea
+              value={driveLinks}
+              onChange={(event) => setDriveLinks(event.target.value)}
+              disabled={isImportingDrive}
+              placeholder="https://drive.google.com/file/d/.../view"
+              className="min-h-32 resize-y"
+            />
+
+            {driveImportItems.length > 0 && (
+              <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border bg-muted/20 p-3">
+                {driveImportItems.map(item => (
+                  <div key={item.id} className="space-y-2 rounded-lg border bg-background p-3 text-xs shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate font-medium">{item.name}</span>
+                      <span className={cn(
+                        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                        item.status === 'complete' && 'bg-emerald-500/10 text-emerald-700',
+                        item.status === 'error' && 'bg-red-500/10 text-red-700',
+                        item.status !== 'complete' && item.status !== 'error' && 'bg-sky-500/10 text-sky-700'
+                      )}>
+                        {item.status === 'complete'
+                          ? 'Xong'
+                          : item.status === 'error'
+                            ? 'Không tải được'
+                            : item.status === 'uploading'
+                              ? 'Đang upload'
+                              : item.status === 'downloading'
+                                ? 'Đang tải'
+                                : 'Đang chờ'}
+                      </span>
+                    </div>
+                    <Progress value={item.progress} className="h-1.5" />
+                    {item.message && (
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">{item.message}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isImportingDrive}
+              onClick={() => setDriveImportOpen(false)}
+            >
+              Đóng
+            </Button>
+            <Button
+              type="button"
+              disabled={isImportingDrive}
+              onClick={handleImportDriveLinks}
+              className="gap-2"
+            >
+              {isImportingDrive ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4" />}
+              {isImportingDrive ? 'Đang tải ảnh...' : 'Bắt đầu tải ảnh'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk Actions Bar */}
       {isSelectionMode && selectedIds.size > 0 && (

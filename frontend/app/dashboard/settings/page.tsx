@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { ExternalLink, Save, Loader2, FlaskConical, Info, XIcon, Trash2 } from 'lucide-react'
+import { ExternalLink, Save, Loader2, FlaskConical, Info, XIcon, Trash2, Eye, EyeOff, KeyRound, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -15,6 +15,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -42,10 +43,12 @@ class SyncAIError extends Error {
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testingCloudinary, setTestingCloudinary] = useState(false)
   const [syncingFull, setSyncingFull] = useState(false)
   const [syncingIncremental, setSyncingIncremental] = useState(false)
   const searchParams = useSearchParams()
   const [cloudinaryGuideOpen, setCloudinaryGuideOpen] = useState(false)
+  const [cloudinaryRequirementOpen, setCloudinaryRequirementOpen] = useState(false)
   const [zoomedImage, setZoomedImage] = useState<string | null>(null)
   const [studioName, setStudioName] = useState('')
   const [email, setEmail] = useState('')
@@ -53,6 +56,7 @@ export default function SettingsPage() {
   const [cloudinaryCloudName, setCloudinaryCloudName] = useState('')
   const [cloudinaryApiKey, setCloudinaryApiKey] = useState('')
   const [cloudinaryApiSecret, setCloudinaryApiSecret] = useState('')
+  const [showCloudinarySecret, setShowCloudinarySecret] = useState(false)
   const [allowSharedCloudinary, setAllowSharedCloudinary] = useState(true)
   const [userRole, setUserRole] = useState('')
   const [globalStats, setGlobalStats] = useState<any>(null)
@@ -62,6 +66,12 @@ export default function SettingsPage() {
   const [vlmApiKey, setVlmApiKey] = useState('')
   const [vlmApiBase, setVlmApiBase] = useState('https://models.inference.ai.azure.com')
   const [vlmModelId, setVlmModelId] = useState('gpt-4o-mini')
+  const [showAdminIntegrationSecrets, setShowAdminIntegrationSecrets] = useState(false)
+  const [googleEnabled, setGoogleEnabled] = useState(false)
+  const [googleApiKey, setGoogleApiKey] = useState('')
+  const [telegramBotEnabled, setTelegramBotEnabled] = useState(false)
+  const [telegramBotToken, setTelegramBotToken] = useState('')
+  const [telegramDefaultChatId, setTelegramDefaultChatId] = useState('')
   const [activeTasks, setActiveTasks] = useState<any[]>([])
 
   // Auto-open Cloudinary guide when redirected from project creation
@@ -101,8 +111,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (searchParams.get('setup') === 'cloudinary') {
-      setCloudinaryGuideOpen(true)
-      toast.warning('Bạn cần cấu hình Cloudinary trước khi tạo show chụp. Hãy làm theo hướng dẫn bên dưới.')
+      setCloudinaryRequirementOpen(true)
     }
   }, [searchParams])
 
@@ -121,6 +130,12 @@ export default function SettingsPage() {
         setVlmApiKey(data.vlmApiKey || '')
         setVlmApiBase(data.vlmApiBase || 'https://models.inference.ai.azure.com')
         setVlmModelId(data.vlmModelId || 'gpt-4o-mini')
+        const adminIntegration = data.adminIntegrationConfig || {}
+        setGoogleEnabled(adminIntegration.google?.enabled ?? false)
+        setGoogleApiKey(adminIntegration.google?.apiKey || '')
+        setTelegramBotEnabled(adminIntegration.telegram?.enabled ?? false)
+        setTelegramBotToken(adminIntegration.telegram?.botToken || '')
+        setTelegramDefaultChatId(adminIntegration.telegram?.defaultChatId || '')
         setUserRole(data.userRole || '')
         setLoading(false)
       })
@@ -138,10 +153,22 @@ export default function SettingsPage() {
         cloudinaryCloudName,
         cloudinaryApiKey,
         cloudinaryApiSecret,
+        allowSharedCloudinary,
         vlmProvider,
         vlmApiKey,
         vlmApiBase,
-        vlmModelId
+        vlmModelId,
+        adminIntegrationConfig: {
+          google: {
+            enabled: googleEnabled,
+            apiKey: googleApiKey,
+          },
+          telegram: {
+            enabled: telegramBotEnabled,
+            botToken: telegramBotToken,
+            defaultChatId: telegramDefaultChatId,
+          },
+        }
       })
     })
 
@@ -201,12 +228,27 @@ export default function SettingsPage() {
   }
 
   const handleTestCloudinary = async () => {
-    const res = await fetch('/api/settings/cloudinary/test', { method: 'POST' })
-    const data = await res.json()
-    if (res.ok) {
-      toast.success(data.message || 'Cloudinary kết nối thành công!')
-    } else {
-      toast.error(data.error || 'Cloudinary test thất bại!')
+    setTestingCloudinary(true)
+    try {
+      const res = await fetch('/api/settings/cloudinary/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cloudinaryCloudName,
+          cloudinaryApiKey,
+          cloudinaryApiSecret,
+        })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(data.message || 'Cloudinary kết nối thành công!')
+      } else {
+        toast.error(data.error || 'Cloudinary test thất bại!')
+      }
+    } catch {
+      toast.error('Lỗi kết nối server')
+    } finally {
+      setTestingCloudinary(false)
     }
   }
 
@@ -242,6 +284,86 @@ export default function SettingsPage() {
                   />
                 </div>
                 
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-primary">Cấu hình Google & Telegram</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Các key này do Admin quản lý chung. Studio chỉ cần bật kênh Telegram trong trang Thông báo.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => setShowAdminIntegrationSecrets(value => !value)}
+                    >
+                      {showAdminIntegrationSecrets ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showAdminIntegrationSecrets ? 'Ẩn key' : 'Hiện key'}
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-3 rounded-lg border bg-background p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="flex items-center gap-2 text-sm font-semibold">
+                            <KeyRound className="h-4 w-4 text-blue-600" />
+                            Google API
+                          </p>
+                          <p className="text-xs text-muted-foreground">Key dùng chung cho các tích hợp Google của hệ thống.</p>
+                        </div>
+                        <Switch checked={googleEnabled} onCheckedChange={setGoogleEnabled} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="admin-google-api-key">Google API Key</Label>
+                        <Input
+                          id="admin-google-api-key"
+                          type={showAdminIntegrationSecrets ? 'text' : 'password'}
+                          value={googleApiKey}
+                          onChange={(event) => setGoogleApiKey(event.target.value)}
+                          placeholder="AIza..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-lg border bg-background p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="flex items-center gap-2 text-sm font-semibold">
+                            <Send className="h-4 w-4 text-emerald-600" />
+                            Telegram bot Studio Pro
+                          </p>
+                          <p className="text-xs text-muted-foreground">Một bot chung để gửi thông báo Telegram cho các studio.</p>
+                        </div>
+                        <Switch checked={telegramBotEnabled} onCheckedChange={setTelegramBotEnabled} />
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-2">
+                          <Label htmlFor="admin-telegram-token">Bot Token</Label>
+                          <Input
+                            id="admin-telegram-token"
+                            type={showAdminIntegrationSecrets ? 'text' : 'password'}
+                            value={telegramBotToken}
+                            onChange={(event) => setTelegramBotToken(event.target.value)}
+                            placeholder="123456:ABC..."
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="admin-telegram-chat">Chat ID mặc định</Label>
+                          <Input
+                            id="admin-telegram-chat"
+                            value={telegramDefaultChatId}
+                            onChange={(event) => setTelegramDefaultChatId(event.target.value)}
+                            placeholder="-1001234567890"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-4 pt-4 border-t">
                   <h3 className="text-sm font-semibold text-primary">Cấu hình AI VLM (Trình phân tích ảnh)</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -506,7 +628,9 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
                 <CardTitle>Cloudinary riêng cho studio</CardTitle>
-                <CardDescription>Nhập thông tin Cloudinary của từng chủ studio và kiểm tra kết nối trước khi dùng.</CardDescription>
+                <CardDescription>
+                  Mỗi studio nên dùng Cloudinary riêng vì lượng ảnh rất lớn; dùng chung một tài khoản có thể làm server quá tải và ảnh hưởng tốc độ xử lý.
+                </CardDescription>
               </div>
               <Button
                 type="button"
@@ -531,11 +655,31 @@ export default function SettingsPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="cloud-secret">API Secret</Label>
-                <Input id="cloud-secret" type="password" value={cloudinaryApiSecret} onChange={(e) => setCloudinaryApiSecret(e.target.value)} placeholder="your_api_secret" />
+                <div className="relative">
+                  <Input
+                    id="cloud-secret"
+                    type={showCloudinarySecret ? 'text' : 'password'}
+                    value={cloudinaryApiSecret}
+                    onChange={(e) => setCloudinaryApiSecret(e.target.value)}
+                    placeholder="your_api_secret"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowCloudinarySecret((value) => !value)}
+                    aria-label={showCloudinarySecret ? 'Ẩn API Secret' : 'Hiện API Secret'}
+                  >
+                    {showCloudinarySecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
             </div>
-            <Button type="button" variant="outline" onClick={handleTestCloudinary} className="gap-2">
-              <FlaskConical className="h-4 w-4" /> Test Cloudinary
+            <Button type="button" variant="outline" onClick={handleTestCloudinary} disabled={testingCloudinary} className="gap-2">
+              {testingCloudinary ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
+              {testingCloudinary ? 'Đang test...' : 'Test Cloudinary'}
             </Button>
           </CardContent>
         </Card>
@@ -548,12 +692,47 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <Dialog open={cloudinaryRequirementOpen} onOpenChange={setCloudinaryRequirementOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader className="space-y-3 text-left">
+            <DialogTitle className="text-2xl">Cần cấu hình Cloudinary riêng</DialogTitle>
+            <DialogDescription className="space-y-3 text-base leading-relaxed">
+              <span className="block">
+                Trước khi tạo show chụp, studio cần dùng tài khoản Cloudinary riêng để lưu và xử lý ảnh.
+              </span>
+              <span className="block">
+                Vì mỗi studio thường tải lên rất nhiều ảnh, việc dùng chung một tài khoản có thể làm server quá tải,
+                ảnh hưởng tốc độ upload và trải nghiệm của khách hàng. Mong chủ studio thông cảm và cấu hình theo hướng dẫn bên dưới.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCloudinaryRequirementOpen(false)}
+            >
+              Để tôi tự cấu hình
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setCloudinaryRequirementOpen(false)
+                setCloudinaryGuideOpen(true)
+              }}
+            >
+              Xem hướng dẫn tạo Cloudinary
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={cloudinaryGuideOpen} onOpenChange={setCloudinaryGuideOpen}>
         <DialogContent className="max-h-[95vh] !w-[95vw] sm:!w-[92vw] lg:!w-[85vw] xl:!w-[1200px] !max-w-none sm:!max-w-none overflow-y-auto p-4 sm:p-6">
           <DialogHeader className="space-y-3 text-left">
             <DialogTitle className="text-2xl">Hướng dẫn tạo tài khoản Cloudinary</DialogTitle>
             <DialogDescription className="text-base">
-              Làm theo 3 bước dưới đây tại{' '}
+              Làm theo bước 1 và 2 trước. Từ bước 3, chọn đúng phần ảnh theo giao diện Cloudinary bạn đang thấy tại{' '}
               <a
                 href="https://cloudinary.com/"
                 target="_blank"
@@ -563,32 +742,27 @@ export default function SettingsPage() {
                 cloudinary.com
                 <ExternalLink className="h-4 w-4" />
               </a>{' '}
-              để tạo tài khoản bằng Google và lấy đủ API key cho studio.
+              để tạo tài khoản bằng Google và lấy đủ API key cho studio. Vì mỗi studio thường xử lý rất nhiều ảnh,
+              hệ thống cần tài khoản Cloudinary riêng để tránh quá tải server và giữ tốc độ ổn định. Mong chủ studio thông cảm.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
             {[
               {
                 step: 1,
-                title: 'Đăng nhập bằng Google',
-                desc: 'Vào Cloudinary và chọn nút đăng nhập bằng Google để tạo tài khoản nhanh.',
+                title: 'Mở trang đăng ký',
+                desc: 'Vào Cloudinary và nhấn Get Started để bắt đầu tạo tài khoản miễn phí.',
                 src: '/cloudinary_setup/b1.png',
-                alt: 'Cloudinary login bằng Google'
+                alt: 'Cloudinary Get Started'
               },
               {
                 step: 2,
-                title: 'Mở View API Keys',
-                desc: 'Sau khi vào dashboard, chọn Next.js và sau đó nhấn vào nút View API Keys để xem thông tin cần điền vào hệ thống.',
+                title: 'Đăng ký bằng Google',
+                desc: 'Chọn Sign up with Google để tạo tài khoản nhanh. Sau khi đăng ký xong, bạn sẽ được đưa vào dashboard Cloudinary.',
                 src: '/cloudinary_setup/b2.png',
-                alt: 'Cloudinary hướng dẫn nhấn View API Keys'
-              },
-              {
-                step: 3,
-                title: 'Lấy Product Environment Credentials',
-                desc: 'Ở mục Product Environment Credentials, hãy nhấn vào biểu tượng con mắt để hiện API Secret trước khi copy sang hệ thống.',
-                src: '/cloudinary_setup/b3.png',
-                alt: 'Cloudinary Product Environment Credentials'
+                alt: 'Cloudinary đăng ký bằng Google'
               }
             ].map((item) => (
               <div key={item.step} className="space-y-4 rounded-xl border bg-muted/30 p-5 transition-colors hover:bg-muted/50">
@@ -615,13 +789,94 @@ export default function SettingsPage() {
                     </span>
                   </div>
                 </div>
-                {item.step === 3 && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-normal text-amber-900">
-                    <span className="font-bold">Lưu ý:</span> API Secret bị ẩn mặc định. Bạn cần nhấn biểu tượng hiện mật khẩu ở cạnh trường này thì mới sao chép được chính xác.
-                  </div>
-                )}
               </div>
             ))}
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-2">
+              {[
+                {
+                  label: 'Giao diện mới',
+                  steps: [
+                    {
+                      step: 3,
+                      title: 'Mở API Keys',
+                      desc: 'Nếu bạn thấy giao diện mới, nhấn API Keys ở thanh trên của Quick Start để mở trang quản lý key.',
+                      src: '/cloudinary_setup/b3_new.png',
+                      alt: 'Cloudinary giao diện mới mở API Keys'
+                    },
+                    {
+                      step: 4,
+                      title: 'Sao chép thông tin API',
+                      desc: 'Tại trang API Keys, sao chép Cloud name, API Key và API Secret rồi điền vào form Cloudinary trong hệ thống.',
+                      src: '/cloudinary_setup/b4_new.png',
+                      alt: 'Cloudinary giao diện mới sao chép Cloud name API Key API Secret'
+                    }
+                  ]
+                },
+                {
+                  label: 'Giao diện cũ',
+                  steps: [
+                    {
+                      step: 3,
+                      title: 'Mở View API Keys',
+                      desc: 'Nếu bạn thấy giao diện cũ, chọn Next.js rồi nhấn View API Keys ở phần Optimize and Transform.',
+                      src: '/cloudinary_setup/b3_old.png',
+                      alt: 'Cloudinary giao diện cũ nhấn View API Keys'
+                    },
+                    {
+                      step: 4,
+                      title: 'Lấy Product Environment Credentials',
+                      desc: 'Trong hộp Product Environment Credentials, sao chép Cloud name, API key và API secret để điền vào hệ thống.',
+                      src: '/cloudinary_setup/b4_old.png',
+                      alt: 'Cloudinary giao diện cũ Product Environment Credentials'
+                    }
+                  ]
+                }
+              ].map((version) => (
+                <section key={version.label} className="space-y-4 rounded-xl border bg-background p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-bold text-primary">{version.label}</h3>
+                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                      Bước 3-4
+                    </span>
+                  </div>
+                  <div className="grid gap-4">
+                    {version.steps.map((item) => (
+                      <div key={`${version.label}-${item.step}`} className="space-y-4 rounded-xl border bg-muted/30 p-5 transition-colors hover:bg-muted/50">
+                        <div className="space-y-1.5">
+                          <p className="text-base font-bold text-primary">Bước {item.step}: {item.title}</p>
+                          <p className="text-sm leading-relaxed text-muted-foreground">
+                            {item.desc}
+                          </p>
+                        </div>
+                        <div
+                          className="group relative cursor-zoom-in overflow-hidden rounded-lg border bg-background transition-all hover:ring-2 hover:ring-primary/50"
+                          onClick={() => setZoomedImage(item.src)}
+                        >
+                          <Image
+                            src={item.src}
+                            alt={item.alt}
+                            width={1200}
+                            height={900}
+                            className="h-auto w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/5">
+                            <span className="rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                              Nhấn để phóng to
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-normal text-amber-900">
+              <span className="font-bold">Lưu ý:</span> API Secret có thể bị ẩn mặc định. Nếu chưa thấy đầy đủ API Secret, hãy nhấn biểu tượng con mắt trước khi sao chép.
+            </div>
           </div>
         </DialogContent>
       </Dialog>

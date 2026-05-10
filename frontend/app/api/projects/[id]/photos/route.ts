@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { buildPreviewUrl } from '@/lib/storage'
 import { buildBackendUrl } from '@/lib/backend-api'
 import { syncProjectPhotoAiContexts } from '@/lib/ai-context-sync'
-import { getCloudinaryCredentialsForProject, validateUserCloudinarySettings } from '@/lib/cloudinary-settings'
+import { getCloudinaryCredentialsForProject, validateExistingProjectCloudinarySettings } from '@/lib/cloudinary-settings'
 import { v2 as cloudinary } from 'cloudinary'
 
 // Cấu hình Cloudinary
@@ -30,7 +30,7 @@ export async function POST(
   }
   
   // Kiểm tra xem user đã cấu hình Cloudinary hay chưa
-  const { isConfigured, missing } = await validateUserCloudinarySettings(project.createdBy)
+  const { isConfigured, missing } = await validateExistingProjectCloudinarySettings(project.createdBy)
   
   if (!isConfigured) {
     return NextResponse.json(

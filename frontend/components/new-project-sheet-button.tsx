@@ -2,12 +2,13 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { Plus, Upload, X, Image as ImageIcon, Loader2, Link as LinkIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Sheet,
   SheetContent,
@@ -24,6 +25,14 @@ interface UploadFile {
   progress: number
   status: 'pending' | 'uploading' | 'complete' | 'error'
   file: File
+}
+
+interface DriveImportItem {
+  id: string
+  name: string
+  progress: number
+  status: 'pending' | 'downloading' | 'uploading' | 'complete' | 'error'
+  message?: string
 }
 
 interface NewProjectSheetButtonProps {
@@ -49,6 +58,9 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
   // Upload state
   const [isDragging, setIsDragging] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([])
+  const [driveLinksOpen, setDriveLinksOpen] = useState(false)
+  const [driveLinks, setDriveLinks] = useState('')
+  const [driveImportItems, setDriveImportItems] = useState<DriveImportItem[]>([])
 
   useEffect(() => {
     if (!sheetOpen) return
@@ -77,6 +89,9 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
     setMaxSelections('50')
     setDeadline('')
     setUploadFiles([])
+    setDriveLinks('')
+    setDriveLinksOpen(false)
+    setDriveImportItems([])
   }
 
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }, [])
@@ -107,6 +122,132 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
     setUploadFiles(prev => prev.filter(f => f.id !== id))
   }
 
+  const upsertDriveImportItem = (id: string, patch: Partial<DriveImportItem>) => {
+    setDriveImportItems(prev => {
+      const existing = prev.find(item => item.id === id)
+      if (!existing) {
+        return [
+          ...prev,
+          {
+            id,
+            name: patch.name || 'Google Drive image',
+            progress: patch.progress ?? 0,
+            status: patch.status || 'pending',
+            message: patch.message,
+          },
+        ]
+      }
+
+      return prev.map(item => item.id === id ? { ...item, ...patch } : item)
+    })
+  }
+
+  const importDriveLinks = async (projectId: string) => {
+    const urls = driveLinks
+      .split(/\s+/)
+      .map(link => link.trim())
+      .filter(Boolean)
+
+    if (urls.length === 0) return { uploaded: 0, failed: 0 }
+
+    setDriveImportItems(urls.map((url, index) => ({
+      id: `link-${index}`,
+      name: url,
+      progress: 5,
+      status: 'pending',
+      message: 'Đang chuẩn bị đọc link...',
+    })))
+
+    let uploaded = 0
+    let failed = 0
+
+    const res = await fetch(`/api/projects/${projectId}/photos/google-drive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls }),
+    })
+
+    if (!res.ok || !res.body) {
+      const payload = await res.json().catch(() => null)
+      throw new Error(payload?.error || 'Không thể bắt đầu tải ảnh từ Google Drive.')
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line.trim()) continue
+        const event = JSON.parse(line)
+
+        if (event.type === 'queued') {
+          setDriveImportItems(event.items.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            progress: 10,
+            status: 'pending',
+            message: 'Đã nhận link, chờ tải ảnh...',
+          })))
+        }
+
+        if (event.type === 'item-start') {
+          upsertDriveImportItem(event.id, {
+            name: event.name,
+            progress: 30,
+            status: 'downloading',
+            message: event.message,
+          })
+        }
+
+        if (event.type === 'item-uploading') {
+          upsertDriveImportItem(event.id, {
+            progress: 70,
+            status: 'uploading',
+            message: event.message,
+          })
+        }
+
+        if (event.type === 'item-complete') {
+          upsertDriveImportItem(event.id, {
+            name: event.name,
+            progress: 100,
+            status: 'complete',
+            message: 'Đã tải lên Cloudinary.',
+          })
+        }
+
+        if (event.type === 'item-error') {
+          failed += 1
+          upsertDriveImportItem(event.id, {
+            name: event.name,
+            progress: 100,
+            status: 'error',
+            message: event.message,
+          })
+        }
+
+        if (event.type === 'done') {
+          uploaded = event.uploaded || uploaded
+          failed = event.failed ?? failed
+        }
+
+        if (event.type === 'error') {
+          throw new Error(event.message)
+        }
+      }
+    }
+
+    return { uploaded, failed }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isSubmitting) return
@@ -135,6 +276,7 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
         throw new Error(errorData?.error || 'Failed to create project')
       }
       const project = await res.json()
+      let driveResult = { uploaded: 0, failed: 0 }
 
       // Upload files
       const filesToUpload = uploadFiles.filter(f => f.status !== 'complete')
@@ -158,11 +300,19 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
         }
       }
 
+      driveResult = await importDriveLinks(project.id)
+      if (driveResult.uploaded > 0) {
+        toast.success(`Đã tải ${driveResult.uploaded} ảnh từ Google Drive!`)
+      }
+      if (driveResult.failed > 0) {
+        toast.error(`${driveResult.failed} link Google Drive không tải được. Vui lòng kiểm tra quyền truy cập.`)
+      }
+
       toast.success('Tạo show chụp thành công! Link sẽ được gửi đến khách hàng.')
       resetForm()
       setSheetOpen(false)
       router.refresh()
-      setTimeout(() => window.location.reload(), 100)
+      setTimeout(() => window.location.reload(), driveResult.failed > 0 ? 2500 : 100)
     } catch (err) {
       toast.error('Có lỗi xảy ra: ' + (err as Error).message)
     } finally {
@@ -261,6 +411,34 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
                   </label>
                 </div>
 
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start gap-2 border-dashed"
+                  onClick={() => setDriveLinksOpen(open => !open)}
+                  disabled={isSubmitting}
+                >
+                  <LinkIcon className="h-4 w-4" />
+                  Thêm ảnh từ Google Drive
+                </Button>
+
+                {driveLinksOpen && (
+                  <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                    <Label htmlFor="ns-driveLinks" className="text-xs">Link Google Drive</Label>
+                    <Textarea
+                      id="ns-driveLinks"
+                      value={driveLinks}
+                      onChange={e => setDriveLinks(e.target.value)}
+                      placeholder="https://drive.google.com/file/d/.../view"
+                      className="min-h-24 resize-y bg-background text-xs"
+                      disabled={isSubmitting}
+                    />
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      Dán một hoặc nhiều link, mỗi link một dòng hoặc cách nhau bằng khoảng trắng. Link cần bật quyền “Anyone with the link can view”.
+                    </p>
+                  </div>
+                )}
+
                 <p className="text-[10px] text-muted-foreground text-center italic mb-2">
                   * Ảnh sẽ được tải lên sau khi bạn nhấn nút bên dưới
                 </p>
@@ -290,6 +468,39 @@ export function NewProjectSheetButton({ className, variant = 'default' }: NewPro
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {driveImportItems.length > 0 && (
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {driveImportItems.map(item => (
+                      <div key={item.id} className="flex items-center gap-2 rounded-md border p-2">
+                        <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium">{item.name}</p>
+                          {item.status !== 'pending' && (
+                            <Progress value={item.progress} className="mt-1.5 h-1" />
+                          )}
+                          {item.message && (
+                            <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{item.message}</p>
+                          )}
+                        </div>
+                        <span className={cn(
+                          "shrink-0 text-[10px] font-medium",
+                          item.status === 'complete' && "text-green-500",
+                          item.status === 'error' && "text-red-500",
+                          (item.status === 'downloading' || item.status === 'uploading') && "text-primary"
+                        )}>
+                          {item.status === 'complete'
+                            ? 'Xong'
+                            : item.status === 'error'
+                              ? 'Lỗi'
+                              : item.status === 'pending'
+                                ? 'Chờ'
+                                : `${item.progress}%`}
+                        </span>
                       </div>
                     ))}
                   </div>

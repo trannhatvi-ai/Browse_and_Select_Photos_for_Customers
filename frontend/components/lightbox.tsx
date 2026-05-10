@@ -25,6 +25,8 @@ export function Lightbox({
   onComment,
 }: LightboxProps) {
   const currentPhoto = photos[currentIndex]
+  const previousPhoto = currentIndex > 0 ? photos[currentIndex - 1] : null
+  const nextPhoto = currentIndex < photos.length - 1 ? photos[currentIndex + 1] : null
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -150,6 +152,12 @@ export function Lightbox({
 
   if (!isOpen || !currentPhoto) return null
 
+  const swipeProgress = scale === 1 ? Math.min(Math.abs(dragOffset) / 180, 1) : 0
+  const imageTransition = isDragging || touchStart !== null ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.3s ease'
+  const currentTransform = scale === 1
+    ? `translateX(${dragOffset}px) scale(${1 - swipeProgress * 0.04})`
+    : `translate(${position.x}px, ${position.y}px) scale(${scale})`
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black overflow-hidden"
@@ -240,16 +248,45 @@ export function Lightbox({
         onMouseDown={handleMouseDown}
         onWheel={handleWheel}
       >
-        <img
-          src={currentPhoto.src}
-          alt={currentPhoto.filename}
-          style={{ 
-            transform: `translate(${position.x + dragOffset}px, ${position.y}px) scale(${scale})`,
-            transition: isDragging || touchStart !== null ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)'
-          }}
-          className="max-h-full max-w-full object-contain pointer-events-none will-change-transform"
-          crossOrigin="anonymous"
-        />
+        <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
+          {previousPhoto && scale === 1 && (
+            <img
+              src={previousPhoto.src}
+              alt={previousPhoto.filename}
+              style={{
+                opacity: dragOffset > 0 ? Math.min(0.25 + swipeProgress * 0.75, 1) : 0,
+                transform: `translateX(calc(-100% + ${Math.max(dragOffset, 0)}px)) scale(${0.92 + swipeProgress * 0.08})`,
+                transition: imageTransition,
+              }}
+              className="pointer-events-none absolute max-h-full max-w-full object-contain will-change-transform"
+              crossOrigin="anonymous"
+            />
+          )}
+          {nextPhoto && scale === 1 && (
+            <img
+              src={nextPhoto.src}
+              alt={nextPhoto.filename}
+              style={{
+                opacity: dragOffset < 0 ? Math.min(0.25 + swipeProgress * 0.75, 1) : 0,
+                transform: `translateX(calc(100% + ${Math.min(dragOffset, 0)}px)) scale(${0.92 + swipeProgress * 0.08})`,
+                transition: imageTransition,
+              }}
+              className="pointer-events-none absolute max-h-full max-w-full object-contain will-change-transform"
+              crossOrigin="anonymous"
+            />
+          )}
+          <img
+            src={currentPhoto.src}
+            alt={currentPhoto.filename}
+            style={{
+              opacity: scale === 1 ? 1 - swipeProgress * 0.08 : 1,
+              transform: currentTransform,
+              transition: imageTransition,
+            }}
+            className="pointer-events-none absolute max-h-full max-w-full object-contain will-change-transform"
+            crossOrigin="anonymous"
+          />
+        </div>
       </div>
 
       {/* Bottom bar */}

@@ -116,6 +116,7 @@ export function ComparisonViewer({
       {/* Grid container */}
       <div className="grid flex-1 min-h-0 gap-1 overflow-hidden grid-cols-1 sm:grid-cols-2">
         <PhotoPanel
+          photos={photos}
           photo={leftPhoto}
           side="left"
           index={leftIndex}
@@ -127,6 +128,7 @@ export function ComparisonViewer({
           navigatePhoto={navigatePhoto}
         />
         <PhotoPanel
+          photos={photos}
           photo={rightPhoto}
           side="right"
           index={rightIndex}
@@ -148,6 +150,7 @@ export function ComparisonViewer({
 }
 
 interface PhotoPanelProps {
+  photos: Photo[]
   photo: Photo
   side: 'left' | 'right'
   index: number
@@ -160,6 +163,7 @@ interface PhotoPanelProps {
 }
 
 function PhotoPanel({
+  photos,
   photo,
   side,
   index,
@@ -174,6 +178,14 @@ function PhotoPanel({
   const [showHeart, setShowHeart] = useState(false)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchDiff, setTouchDiff] = useState(0)
+  const previousPhoto = index > 0 ? photos[index - 1] : null
+  const nextPhoto = index < total - 1 ? photos[index + 1] : null
+  const boundedTouchDiff =
+    (touchDiff > 0 && previousPhoto) || (touchDiff < 0 && nextPhoto)
+      ? touchDiff
+      : touchDiff * 0.25
+  const swipeProgress = Math.min(Math.abs(boundedTouchDiff) / 180, 1)
+  const imageTransition = touchStart !== null ? 'none' : 'transform 0.28s cubic-bezier(0.2, 0, 0, 1), opacity 0.28s ease'
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX)
@@ -195,7 +207,7 @@ function PhotoPanel({
     }
     setLastTap(now)
 
-    if (Math.abs(touchDiff) > 50) {
+    if (Math.abs(boundedTouchDiff) > 50) {
       if (touchDiff < 0) navigatePhoto(side, 'next')
       else navigatePhoto(side, 'prev')
     }
@@ -236,13 +248,13 @@ function PhotoPanel({
       {/* Swipe Arrows Indicators */}
       <div 
         className="pointer-events-none absolute left-4 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md transition-opacity duration-200"
-        style={{ opacity: touchDiff > 20 ? Math.min(touchDiff / 100, 0.8) : 0 }}
+        style={{ opacity: boundedTouchDiff > 20 ? Math.min(boundedTouchDiff / 100, 0.8) : 0 }}
       >
         <ChevronLeft className="h-6 w-6" />
       </div>
       <div 
         className="pointer-events-none absolute right-4 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md transition-opacity duration-200"
-        style={{ opacity: touchDiff < -20 ? Math.min(Math.abs(touchDiff) / 100, 0.8) : 0 }}
+        style={{ opacity: boundedTouchDiff < -20 ? Math.min(Math.abs(boundedTouchDiff) / 100, 0.8) : 0 }}
       >
         <ChevronRight className="h-6 w-6" />
       </div>
@@ -276,15 +288,42 @@ function PhotoPanel({
       </button>
 
       <div className="flex flex-1 min-h-0 items-center justify-center p-2 sm:p-4">
-        <div className="relative flex h-full max-h-full max-w-full items-center justify-center">
+        <div className="relative flex h-full max-h-full w-full max-w-full items-center justify-center overflow-hidden">
+          {previousPhoto && (
+            <img
+              src={previousPhoto.src}
+              alt={previousPhoto.filename}
+              className="pointer-events-none absolute inset-0 z-0 h-full w-full select-none object-contain"
+              crossOrigin="anonymous"
+              style={{
+                opacity: boundedTouchDiff > 0 ? Math.min(0.25 + swipeProgress * 0.75, 1) : 0,
+                transform: `translateX(calc(-100% + ${Math.max(boundedTouchDiff, 0)}px)) scale(${0.92 + swipeProgress * 0.08})`,
+                transition: imageTransition,
+              }}
+            />
+          )}
+          {nextPhoto && (
+            <img
+              src={nextPhoto.src}
+              alt={nextPhoto.filename}
+              className="pointer-events-none absolute inset-0 z-0 h-full w-full select-none object-contain"
+              crossOrigin="anonymous"
+              style={{
+                opacity: boundedTouchDiff < 0 ? Math.min(0.25 + swipeProgress * 0.75, 1) : 0,
+                transform: `translateX(calc(100% + ${Math.min(boundedTouchDiff, 0)}px)) scale(${0.92 + swipeProgress * 0.08})`,
+                transition: imageTransition,
+              }}
+            />
+          )}
           <img
             src={photo.src}
             alt={photo.filename}
-            className="max-h-full max-w-full object-contain pointer-events-none select-none"
+            className="pointer-events-none relative z-10 max-h-full max-w-full select-none object-contain"
             crossOrigin="anonymous"
             style={{ 
-              transform: touchStart !== null ? `translateX(${touchDiff}px)` : 'none',
-              transition: touchStart !== null ? 'none' : 'transform 0.3s ease'
+              opacity: 1 - swipeProgress * 0.08,
+              transform: `translateX(${boundedTouchDiff}px) scale(${1 - swipeProgress * 0.04})`,
+              transition: imageTransition,
             }}
           />
         </div>

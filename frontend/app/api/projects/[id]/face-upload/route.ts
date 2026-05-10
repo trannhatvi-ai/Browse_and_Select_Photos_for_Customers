@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v2 as cloudinary } from 'cloudinary'
-import { getCloudinaryCredentialsForProject, validateUserCloudinarySettings } from '@/lib/cloudinary-settings'
+import { getCloudinaryCredentialsForProject, validateExistingProjectCloudinarySettings } from '@/lib/cloudinary-settings'
 
 export async function POST(
   req: NextRequest,
@@ -13,7 +13,7 @@ export async function POST(
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
 
-  const { isConfigured, missing } = await validateUserCloudinarySettings(project.createdBy)
+  const { isConfigured, missing } = await validateExistingProjectCloudinarySettings(project.createdBy)
   if (!isConfigured) {
     return NextResponse.json(
       {
