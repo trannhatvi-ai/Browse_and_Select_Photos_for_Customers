@@ -18,8 +18,18 @@ model User {
   phone        String?   @unique
   password     String?   // hashed bcrypt for admin; null for client access via token
   role         Role      @default(STUDIO)
+  authProvider String    @default("credentials")
+  googleId     String?   @unique
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+  emailVerificationCodeHash String?
+  emailVerificationExpires DateTime?
+  phoneVerificationCodeHash String?
+  phoneVerificationExpires DateTime?
   passwordResetToken      String?
   passwordResetExpires     DateTime?
+  passwordResetCodeHash    String?
+  passwordResetCodeExpires DateTime?
   projects     Project[]
   schedules    ShootSchedule[]
   notificationLogs NotificationLog[]

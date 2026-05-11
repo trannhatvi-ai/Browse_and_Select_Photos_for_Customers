@@ -1,13 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db'
+import { isExpired, normalizePhone, verifyOtpCode } from '@/lib/auth-verification'
 
 export async function POST(req: NextRequest) {
   try {
-    const { token, password } = await req.json()
+    const { token, password, phone, code } = await req.json()
 
-    if (!token || !password) {
+    if ((!token && (!phone || !code)) || !password) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    if (String(password).length < 6) {
+      return NextResponse.json({ error: 'Mật khẩu phải có ít nhất 6 ký tự' }, { status: 400 })
+    }
+
+    if (phone && code) {
+      const normalizedPhone = normalizePhone(phone)
+      const user = await prisma.user.findFirst({
+        where: {
+          phone: normalizedPhone,
+          phoneVerifiedAt: { not: null },
+        },
+      })
+
+      if (
+        !user ||
+        isExpired(user.passwordResetCodeExpires) ||
+        !verifyOtpCode(code, user.passwordResetCodeHash)
+      ) {
+        return NextResponse.json({ error: 'Mã khôi phục không hợp lệ hoặc đã hết hạn' }, { status: 400 })
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10)
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          passwordResetCodeHash: null,
+          passwordResetCodeExpires: null,
+          passwordResetToken: null,
+          passwordResetExpires: null,
+        },
+      })
+
+      return NextResponse.json({ success: true })
     }
 
     const user = await prisma.user.findFirst({

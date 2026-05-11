@@ -23,7 +23,7 @@ export function DashboardShell({
       {/* Desktop Sidebar Container */}
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-50 hidden transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) md:block border-r bg-sidebar overflow-hidden',
+          'fixed inset-y-0 left-0 z-50 hidden transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) md:block border-r bg-sidebar overflow-visible',
           isSidebarOpen ? 'w-64' : 'w-20'
         )}
       >

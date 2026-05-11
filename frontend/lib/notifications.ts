@@ -27,11 +27,18 @@ export interface AdminIntegrationConfig {
   google: {
     enabled: boolean
     apiKey: string
+    oauthClientId: string
+    oauthClientSecret: string
   }
   telegram: {
     enabled: boolean
     botToken: string
     defaultChatId: string
+  }
+  resend: {
+    enabled: boolean
+    apiKey: string
+    fromEmail: string
   }
 }
 
@@ -74,11 +81,18 @@ export const DEFAULT_ADMIN_INTEGRATION_CONFIG: AdminIntegrationConfig = {
   google: {
     enabled: false,
     apiKey: '',
+    oauthClientId: '',
+    oauthClientSecret: '',
   },
   telegram: {
     enabled: false,
     botToken: '',
     defaultChatId: '',
+  },
+  resend: {
+    enabled: false,
+    apiKey: '',
+    fromEmail: '',
   },
 }
 
@@ -113,11 +127,18 @@ export function normalizeAdminIntegrationConfig(value: unknown): AdminIntegratio
     google: {
       enabled: raw.google?.enabled ?? false,
       apiKey: raw.google?.apiKey || '',
+      oauthClientId: raw.google?.oauthClientId || '',
+      oauthClientSecret: raw.google?.oauthClientSecret || '',
     },
     telegram: {
       enabled: raw.telegram?.enabled ?? false,
       botToken: raw.telegram?.botToken || '',
       defaultChatId: raw.telegram?.defaultChatId || '',
+    },
+    resend: {
+      enabled: raw.resend?.enabled ?? false,
+      apiKey: raw.resend?.apiKey || '',
+      fromEmail: raw.resend?.fromEmail || '',
     },
   }
 }
@@ -216,6 +237,37 @@ export function buildScheduleReminderHtml(message: string) {
   `
 }
 
+async function resolveTelegramChatTarget(botToken: string, configuredChatId: string) {
+  const value = configuredChatId.trim()
+  if (!value.startsWith('@')) return value
+
+  const username = value.slice(1).toLowerCase()
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/getUpdates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      limit: 100,
+      allowed_updates: ['message'],
+    }),
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok || !data?.ok) {
+    throw new Error(`Không thể kiểm tra liên kết Telegram cho "${value}". Vui lòng thử lại sau.`)
+  }
+
+  const matchedUpdate = data.result?.find((update: any) => {
+    const chatUsername = update.message?.chat?.username?.toLowerCase()
+    const fromUsername = update.message?.from?.username?.toLowerCase()
+    return chatUsername === username || fromUsername === username
+  })
+  const chatId = matchedUpdate?.message?.chat?.id
+  if (!chatId) {
+    throw new Error(`Chưa liên kết được Telegram "${value}". Hãy mở bot @studio_pro_bot, bấm Start hoặc gửi /start, rồi test lại.`)
+  }
+
+  return String(chatId)
+}
+
 export async function sendStudioNotification(
   payload: NotificationPayload,
   channels?: NotificationChannel[]
@@ -240,6 +292,7 @@ async function sendToChannel(
   adminIntegrationConfig: AdminIntegrationConfig,
   payload: NotificationPayload
 ): Promise<NotificationResult> {
+  let attemptedTarget: string | undefined
   try {
     if (channel === 'email') {
       if (!config.email.enabled) return skipped(channel, 'Email chưa được bật.')
@@ -263,10 +316,12 @@ async function sendToChannel(
         throw new Error('Admin chưa cấu hình Bot Token cho Telegram.')
       }
 
-      const chatId = config.telegram.chatId || adminIntegrationConfig.telegram.defaultChatId
-      if (!chatId) {
+      const configuredChatId = config.telegram.chatId || adminIntegrationConfig.telegram.defaultChatId
+      if (!configuredChatId) {
         throw new Error('Chưa cấu hình Chat ID hoặc Admin chưa cấu hình Chat ID mặc định cho Telegram.')
       }
+      attemptedTarget = configuredChatId
+      const chatId = await resolveTelegramChatTarget(adminIntegrationConfig.telegram.botToken, configuredChatId)
 
       const response = await fetch(`https://api.telegram.org/bot${adminIntegrationConfig.telegram.botToken}/sendMessage`, {
         method: 'POST',
@@ -277,8 +332,18 @@ async function sendToChannel(
           disable_web_page_preview: true,
         }),
       })
-      if (!response.ok) throw new Error(await response.text())
-      return { channel, target: chatId, status: 'sent' }
+      if (!response.ok) {
+        const errorText = await response.text()
+        const normalizedError = errorText.toLowerCase()
+        if (normalizedError.includes("can't initiate conversation")) {
+          throw new Error(`Telegram đã nhận "${configuredChatId}", nhưng bot chưa được phép nhắn cho tài khoản này. Hãy mở bot @studio_pro_bot, bấm Start hoặc gửi /start, rồi test lại.`)
+        }
+        if (normalizedError.includes('chat not found')) {
+          throw new Error(`Telegram không tìm thấy "${configuredChatId}". Nếu đây là chat cá nhân, hãy mở bot @studio_pro_bot, gửi /start, rồi test lại.`)
+        }
+        throw new Error(errorText)
+      }
+      return { channel, target: configuredChatId, status: 'sent' }
     }
 
     if (!config.facebook.enabled) return skipped(channel, 'Facebook chưa được bật.')
@@ -302,6 +367,7 @@ async function sendToChannel(
   } catch (error) {
     return {
       channel,
+      target: attemptedTarget,
       status: 'error',
       error: (error as Error).message || 'Không thể gửi thông báo.',
     }

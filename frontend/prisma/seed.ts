@@ -13,6 +13,9 @@ async function main() {
       role: 'ADMIN',
       username: 'admin',
       phone: '0900000000',
+      authProvider: 'credentials',
+      emailVerifiedAt: new Date(),
+      phoneVerifiedAt: new Date(),
     },
     create: {
       email: 'admin',
@@ -20,7 +23,10 @@ async function main() {
       username: 'admin',
       phone: '0900000000',
       password: hashedPassword,
-      role: 'ADMIN'
+      role: 'ADMIN',
+      authProvider: 'credentials',
+      emailVerifiedAt: new Date(),
+      phoneVerifiedAt: new Date(),
     }
   })
 

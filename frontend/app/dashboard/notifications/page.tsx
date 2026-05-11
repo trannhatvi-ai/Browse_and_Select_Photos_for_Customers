@@ -32,6 +32,8 @@ const channelLabels: Record<Channel, string> = {
   facebook: 'Facebook',
 }
 
+const telegramBotUsername = '@studio_pro_bot'
+
 export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -44,6 +46,8 @@ export default function NotificationsPage() {
     () => (Object.keys(channelLabels) as Channel[]).filter(channel => config[channel].enabled),
     [config]
   )
+  const telegramTarget = config.telegram.chatId.trim()
+  const isTelegramUsername = telegramTarget.startsWith('@')
 
   const fetchSettings = async () => {
     setLoading(true)
@@ -177,18 +181,50 @@ export default function NotificationsPage() {
                   <Send className="h-5 w-5 text-emerald-600" />
                   Telegram
                 </CardTitle>
-                <CardDescription>Gửi qua bot Studio Pro. Nhập Chat ID của người nhận thông báo.</CardDescription>
+                <CardDescription>Gửi qua bot Studio Pro. Có thể nhập username như @vinhatt sau khi người dùng liên kết với bot.</CardDescription>
               </div>
               <Switch checked={config.telegram.enabled} onCheckedChange={(enabled) => updateChannel('telegram', { enabled })} />
             </CardHeader>
-            <CardContent className="grid gap-2">
-              <Label htmlFor="telegram-chatid">Telegram Chat ID</Label>
-              <Input
-                id="telegram-chatid"
-                value={config.telegram.chatId}
-                onChange={(event) => updateChannel('telegram', { chatId: event.target.value })}
-                placeholder="Nhập Chat ID hoặc Telegram User ID"
-              />
+            <CardContent className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="telegram-chatid">Telegram Username hoặc Chat ID</Label>
+                <Input
+                  id="telegram-chatid"
+                  value={config.telegram.chatId}
+                  onChange={(event) => updateChannel('telegram', { chatId: event.target.value })}
+                  placeholder="@vinhatt hoặc 5532701420"
+                />
+              </div>
+              <div className="space-y-2 border-l-2 border-emerald-200 pl-4 text-xs leading-relaxed text-muted-foreground">
+                <p className="font-medium text-foreground">Cách liên kết Telegram cá nhân</p>
+                <ol className="list-decimal space-y-1 pl-4">
+                  <li>
+                    Mở bot{' '}
+                    <a
+                      href="https://t.me/studio_pro_bot"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      {telegramBotUsername}
+                    </a>{' '}
+                    trên Telegram.
+                  </li>
+                  <li>Bấm Start hoặc gửi tin nhắn /start cho bot.</li>
+                  <li>Quay lại đây nhập username Telegram, ví dụ @vinhatt, rồi lưu cấu hình.</li>
+                  <li>Bấm Test thông báo để kiểm tra kết nối.</li>
+                </ol>
+              </div>
+              {isTelegramUsername && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                  Bạn đang dùng username {telegramTarget}. Hệ thống sẽ tìm chat id tương ứng từ lần người dùng nhắn /start cho bot.
+                </div>
+              )}
+              {!isTelegramUsername && telegramTarget && (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-900">
+                  Đang dùng numeric Chat ID. Cách này gửi trực tiếp nhất nếu người dùng đã bấm Start với bot.
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { getAdminIntegrationConfig } from '@/lib/notifications'
 
 export interface EmailJobData {
   to: string
@@ -7,8 +8,30 @@ export interface EmailJobData {
   from?: string
 }
 
-// Resend client
-export const resend = new Resend(process.env.RESEND_API_KEY)
+// Resend client - will be initialized with key from admin config or env
+let resend: { apiKey: string; client: Resend } | null = null
+
+async function getResendSettings() {
+  const adminConfig = await getAdminIntegrationConfig()
+  const adminApiKey = adminConfig.resend.enabled ? adminConfig.resend.apiKey.trim() : ''
+  const apiKey = adminApiKey || process.env.RESEND_API_KEY || ''
+  const from = adminConfig.resend.enabled && adminConfig.resend.fromEmail.trim()
+    ? adminConfig.resend.fromEmail.trim()
+    : process.env.EMAIL_FROM || 'Studio Pro <studiopro1008@gmail.com>'
+
+  if (!apiKey) {
+    throw new Error('No Resend API key configured in admin settings or .env')
+  }
+
+  return { apiKey, from }
+}
+
+async function getResendClient(apiKey: string) {
+  if (!resend || resend.apiKey !== apiKey) {
+    resend = { apiKey, client: new Resend(apiKey) }
+  }
+  return resend.client
+}
 
 // Email templates
 export const templates = {
@@ -127,12 +150,13 @@ export async function queueEmail(data: EmailJobData) {
 }
 
 async function sendEmailDirect(data: EmailJobData) {
-  const { to, subject, html, from = process.env.EMAIL_FROM || 'Studio Pro <studiopro1008@gmail.com>' } = data
-  await resend.emails.send({
+  const settings = await getResendSettings()
+  const { to, subject, html, from = settings.from } = data
+  const resendClient = await getResendClient(settings.apiKey)
+  await resendClient.emails.send({
     from,
     to,
     subject,
     html,
   })
 }
-

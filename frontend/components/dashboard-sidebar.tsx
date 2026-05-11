@@ -14,6 +14,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
+import { SharedCloudinaryLogoIndicator } from '@/components/cloudinary-usage-notice'
 import { useSidebar } from '@/components/sidebar-context'
 import { cn } from '@/lib/utils'
 
@@ -48,12 +49,18 @@ export function DashboardSidebar({
         isSidebarOpen ? 'justify-start' : 'justify-center px-0'
       )}>
         {isSidebarOpen && (
-          <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap transition-all duration-300">
+          <div className="flex items-center gap-2 overflow-visible whitespace-nowrap transition-all duration-300">
             <Camera className="h-6 w-6" />
             <span className="text-lg font-semibold">Studio Pro</span>
+            <SharedCloudinaryLogoIndicator />
           </div>
         )}
-        {!isSidebarOpen && <Camera className="h-6 w-6" />}
+        {!isSidebarOpen && (
+          <div className="flex items-center gap-1">
+            <Camera className="h-6 w-6" />
+            <SharedCloudinaryLogoIndicator popoverSide="right" />
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 space-y-1 overflow-hidden p-4">

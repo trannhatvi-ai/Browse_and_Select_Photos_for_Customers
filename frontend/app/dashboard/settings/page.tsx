@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { ExternalLink, Save, Loader2, FlaskConical, Info, XIcon, Trash2, Eye, EyeOff, KeyRound, Send } from 'lucide-react'
+import { ExternalLink, Save, Loader2, FlaskConical, Info, XIcon, Trash2, Eye, EyeOff, KeyRound, Send, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -58,6 +58,7 @@ export default function SettingsPage() {
   const [cloudinaryApiSecret, setCloudinaryApiSecret] = useState('')
   const [showCloudinarySecret, setShowCloudinarySecret] = useState(false)
   const [allowSharedCloudinary, setAllowSharedCloudinary] = useState(true)
+  const [adminSharedCloudinaryAvailable, setAdminSharedCloudinaryAvailable] = useState(false)
   const [userRole, setUserRole] = useState('')
   const [globalStats, setGlobalStats] = useState<any>(null)
   const [loadingStats, setLoadingStats] = useState(false)
@@ -67,8 +68,14 @@ export default function SettingsPage() {
   const [vlmApiBase, setVlmApiBase] = useState('https://models.inference.ai.azure.com')
   const [vlmModelId, setVlmModelId] = useState('gpt-4o-mini')
   const [showAdminIntegrationSecrets, setShowAdminIntegrationSecrets] = useState(false)
+  const [appOrigin, setAppOrigin] = useState('')
   const [googleEnabled, setGoogleEnabled] = useState(false)
   const [googleApiKey, setGoogleApiKey] = useState('')
+  const [googleOauthClientId, setGoogleOauthClientId] = useState('')
+  const [googleOauthClientSecret, setGoogleOauthClientSecret] = useState('')
+  const [resendEnabled, setResendEnabled] = useState(false)
+  const [resendApiKey, setResendApiKey] = useState('')
+  const [resendFromEmail, setResendFromEmail] = useState('')
   const [telegramBotEnabled, setTelegramBotEnabled] = useState(false)
   const [telegramBotToken, setTelegramBotToken] = useState('')
   const [telegramDefaultChatId, setTelegramDefaultChatId] = useState('')
@@ -116,6 +123,10 @@ export default function SettingsPage() {
   }, [searchParams])
 
   useEffect(() => {
+    setAppOrigin(window.location.origin)
+  }, [])
+
+  useEffect(() => {
     fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
@@ -126,6 +137,7 @@ export default function SettingsPage() {
         setCloudinaryApiKey(data.cloudinaryApiKey || '')
         setCloudinaryApiSecret(data.cloudinaryApiSecret || '')
         setAllowSharedCloudinary(data.allowSharedCloudinary ?? true)
+        setAdminSharedCloudinaryAvailable(data.adminSharedCloudinaryAvailable ?? false)
         setVlmProvider(data.vlmProvider || 'gemini')
         setVlmApiKey(data.vlmApiKey || '')
         setVlmApiBase(data.vlmApiBase || 'https://models.inference.ai.azure.com')
@@ -133,6 +145,11 @@ export default function SettingsPage() {
         const adminIntegration = data.adminIntegrationConfig || {}
         setGoogleEnabled(adminIntegration.google?.enabled ?? false)
         setGoogleApiKey(adminIntegration.google?.apiKey || '')
+        setGoogleOauthClientId(adminIntegration.google?.oauthClientId || '')
+        setGoogleOauthClientSecret(adminIntegration.google?.oauthClientSecret || '')
+        setResendEnabled(adminIntegration.resend?.enabled ?? false)
+        setResendApiKey(adminIntegration.resend?.apiKey || '')
+        setResendFromEmail(adminIntegration.resend?.fromEmail || '')
         setTelegramBotEnabled(adminIntegration.telegram?.enabled ?? false)
         setTelegramBotToken(adminIntegration.telegram?.botToken || '')
         setTelegramDefaultChatId(adminIntegration.telegram?.defaultChatId || '')
@@ -140,6 +157,11 @@ export default function SettingsPage() {
         setLoading(false)
       })
   }, [])
+
+  const hasCompleteStudioCloudinary = [cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret]
+    .every(value => value.trim().length > 0)
+  const isUsingSharedCloudinary = userRole !== 'ADMIN' && adminSharedCloudinaryAvailable && !hasCompleteStudioCloudinary
+  const googleRedirectUri = `${appOrigin || 'http://localhost:3000'}/api/auth/callback/google`
 
   const handleSave = async () => {
     setSaving(true)
@@ -162,6 +184,13 @@ export default function SettingsPage() {
           google: {
             enabled: googleEnabled,
             apiKey: googleApiKey,
+            oauthClientId: googleOauthClientId,
+            oauthClientSecret: googleOauthClientSecret,
+          },
+          resend: {
+            enabled: resendEnabled,
+            apiKey: resendApiKey,
+            fromEmail: resendFromEmail,
           },
           telegram: {
             enabled: telegramBotEnabled,
@@ -284,12 +313,12 @@ export default function SettingsPage() {
                   />
                 </div>
                 
-                <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-6 pt-4 border-t">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-1">
-                      <h3 className="text-sm font-semibold text-primary">Cấu hình Google & Telegram</h3>
+                      <h3 className="text-sm font-semibold text-primary">Cấu hình đăng nhập & gửi mail</h3>
                       <p className="text-xs text-muted-foreground">
-                        Các key này do Admin quản lý chung. Studio chỉ cần bật kênh Telegram trong trang Thông báo.
+                        Các key này do Admin quản lý chung để bật đăng nhập Google và gửi email hệ thống cho studio.
                       </p>
                     </div>
                     <Button
@@ -304,64 +333,121 @@ export default function SettingsPage() {
                     </Button>
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="space-y-3 rounded-lg border bg-background p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="flex items-center gap-2 text-sm font-semibold">
-                            <KeyRound className="h-4 w-4 text-blue-600" />
-                            Google API
-                          </p>
-                          <p className="text-xs text-muted-foreground">Key dùng chung cho các tích hợp Google của hệ thống.</p>
-                        </div>
-                        <Switch checked={googleEnabled} onCheckedChange={setGoogleEnabled} />
+                  <section className="space-y-4 rounded-lg border bg-background p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="flex items-center gap-2 text-sm font-semibold">
+                          <KeyRound className="h-4 w-4 text-blue-600" />
+                          Cấu hình Google OAuth để đăng nhập
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Dùng OAuth Client ID và Client Secret của Google Cloud Console để bật nút đăng nhập Google.
+                        </p>
+                      </div>
+                      <Switch checked={googleEnabled} onCheckedChange={setGoogleEnabled} />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="admin-google-client-id">Google OAuth Client ID</Label>
+                        <Input
+                          id="admin-google-client-id"
+                          value={googleOauthClientId}
+                          onChange={(event) => setGoogleOauthClientId(event.target.value)}
+                          placeholder="1234567890-abc.apps.googleusercontent.com"
+                        />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="admin-google-api-key">Google API Key</Label>
+                        <Label htmlFor="admin-google-client-secret">Google OAuth Client Secret</Label>
                         <Input
-                          id="admin-google-api-key"
+                          id="admin-google-client-secret"
                           type={showAdminIntegrationSecrets ? 'text' : 'password'}
-                          value={googleApiKey}
-                          onChange={(event) => setGoogleApiKey(event.target.value)}
-                          placeholder="AIza..."
+                          value={googleOauthClientSecret}
+                          onChange={(event) => setGoogleOauthClientSecret(event.target.value)}
+                          placeholder="GOCSPX-..."
+                        />
+                      </div>
+                      <div className="grid gap-2 sm:col-span-2">
+                        <Label htmlFor="admin-google-redirect-uri">Authorized redirect URI cần thêm trong Google</Label>
+                        <Input id="admin-google-redirect-uri" value={googleRedirectUri} readOnly />
+                      </div>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Sau khi lưu, nút Google ở trang đăng nhập sẽ bật ngay nếu đủ Client ID và Client Secret.
+                    </p>
+                  </section>
+
+                  <section className="space-y-4 rounded-lg border bg-background p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="flex items-center gap-2 text-sm font-semibold">
+                          <Mail className="h-4 w-4 text-purple-600" />
+                          Cấu hình Resend để gửi mail cho studio
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Dùng cho email xác thực tài khoản, khôi phục mật khẩu, lời mời xem gallery và thông báo hệ thống.
+                        </p>
+                      </div>
+                      <Switch checked={resendEnabled} onCheckedChange={setResendEnabled} />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="admin-resend-api-key">Resend API Key</Label>
+                        <Input
+                          id="admin-resend-api-key"
+                          type={showAdminIntegrationSecrets ? 'text' : 'password'}
+                          value={resendApiKey}
+                          onChange={(event) => setResendApiKey(event.target.value)}
+                          placeholder="re_..."
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="admin-resend-from-email">Email người gửi</Label>
+                        <Input
+                          id="admin-resend-from-email"
+                          value={resendFromEmail}
+                          onChange={(event) => setResendFromEmail(event.target.value)}
+                          placeholder="Studio Pro <hello@yourdomain.com>"
                         />
                       </div>
                     </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Email người gửi phải thuộc domain đã verify trong Resend. Nếu bỏ trống, hệ thống dùng EMAIL_FROM trong .env.
+                    </p>
+                  </section>
 
-                    <div className="space-y-3 rounded-lg border bg-background p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="flex items-center gap-2 text-sm font-semibold">
-                            <Send className="h-4 w-4 text-emerald-600" />
-                            Telegram bot Studio Pro
-                          </p>
-                          <p className="text-xs text-muted-foreground">Một bot chung để gửi thông báo Telegram cho các studio.</p>
-                        </div>
-                        <Switch checked={telegramBotEnabled} onCheckedChange={setTelegramBotEnabled} />
+                  <section className="space-y-4 rounded-lg border bg-background p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="flex items-center gap-2 text-sm font-semibold">
+                          <Send className="h-4 w-4 text-emerald-600" />
+                          Telegram bot Studio Pro
+                        </p>
+                        <p className="text-xs text-muted-foreground">Một bot chung để gửi thông báo Telegram cho các studio.</p>
                       </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                          <Label htmlFor="admin-telegram-token">Bot Token</Label>
-                          <Input
-                            id="admin-telegram-token"
-                            type={showAdminIntegrationSecrets ? 'text' : 'password'}
-                            value={telegramBotToken}
-                            onChange={(event) => setTelegramBotToken(event.target.value)}
-                            placeholder="123456:ABC..."
-                          />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="admin-telegram-chat">Chat ID mặc định</Label>
-                          <Input
-                            id="admin-telegram-chat"
-                            value={telegramDefaultChatId}
-                            onChange={(event) => setTelegramDefaultChatId(event.target.value)}
-                            placeholder="-1001234567890"
-                          />
-                        </div>
+                      <Switch checked={telegramBotEnabled} onCheckedChange={setTelegramBotEnabled} />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="admin-telegram-token">Bot Token</Label>
+                        <Input
+                          id="admin-telegram-token"
+                          type={showAdminIntegrationSecrets ? 'text' : 'password'}
+                          value={telegramBotToken}
+                          onChange={(event) => setTelegramBotToken(event.target.value)}
+                          placeholder="123456:ABC..."
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="admin-telegram-chat">Chat ID mặc định</Label>
+                        <Input
+                          id="admin-telegram-chat"
+                          value={telegramDefaultChatId}
+                          onChange={(event) => setTelegramDefaultChatId(event.target.value)}
+                          placeholder="-1001234567890"
+                        />
                       </div>
                     </div>
-                  </div>
+                  </section>
                 </div>
 
                 <div className="space-y-4 pt-4 border-t">
@@ -644,6 +730,18 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {isUsingSharedCloudinary && (
+              <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <div className="space-y-1">
+                  <p className="font-medium">Studio đang dùng chung Cloudinary của Admin</p>
+                  <p className="text-xs leading-relaxed text-amber-800">
+                    Hiện tài khoản của bạn đang lưu ảnh bằng Cloudinary dùng chung với các studio khác.
+                    Bạn nên cấu hình Cloudinary riêng để có dung lượng độc lập, upload thoải mái hơn và tránh bị ảnh hưởng khi nhiều studio cùng sử dụng.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="cloud-name">Cloud Name</Label>
               <Input id="cloud-name" value={cloudinaryCloudName} onChange={(e) => setCloudinaryCloudName(e.target.value)} placeholder="your_cloud_name" />

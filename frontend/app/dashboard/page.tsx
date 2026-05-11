@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { StatsCards } from '@/components/stats-cards'
 import { ProjectsTable } from '@/components/projects-table'
 import { NewProjectSheetButton } from '@/components/new-project-sheet-button'
+import { SharedCloudinaryNotice } from '@/components/cloudinary-usage-notice'
 import { prisma } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -72,6 +73,8 @@ export default async function DashboardPage() {
         {/* Desktop button only */}
         <NewProjectSheetButton className="hidden md:flex" />
       </div>
+
+      <SharedCloudinaryNotice />
 
       {/* Stats */}
       <StatsCards stats={stats} />

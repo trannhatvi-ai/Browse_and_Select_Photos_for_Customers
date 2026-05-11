@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Lock, Mail, Eye, EyeOff, Sparkles } from 'lucide-react'
+import { ArrowRight, Lock, Mail, Eye, EyeOff, Sparkles, Phone, ShieldCheck, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -26,10 +26,23 @@ export default function LoginClient() {
   const [forgotMethod, setForgotMethod] = useState<'email' | 'phone'>('email')
   const [forgotIdentifier, setForgotIdentifier] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
+  const [phoneResetPending, setPhoneResetPending] = useState(false)
+  const [phoneResetIdentifier, setPhoneResetIdentifier] = useState('')
+  const [phoneResetCode, setPhoneResetCode] = useState('')
+  const [phoneResetPassword, setPhoneResetPassword] = useState('')
+  const [phoneResetConfirmPassword, setPhoneResetConfirmPassword] = useState('')
+  const [phoneResetLoading, setPhoneResetLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('')
+  const [googleAvailable, setGoogleAvailable] = useState(false)
+  const [verifyEmail, setVerifyEmail] = useState('')
+  const [verifyPhone, setVerifyPhone] = useState('')
+  const [verifyEmailCode, setVerifyEmailCode] = useState('')
+  const [verifyPhoneCode, setVerifyPhoneCode] = useState('')
+  const [verifyLoading, setVerifyLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -37,10 +50,17 @@ export default function LoginClient() {
 
   useEffect(() => {
     const tab = searchParams.get('tab')
-    if (tab === 'register' || tab === 'forgot' || tab === 'login') {
+    if (tab === 'register' || tab === 'forgot' || tab === 'login' || tab === 'verify') {
       setActiveTab(tab)
     }
   }, [searchParams])
+
+  useEffect(() => {
+    fetch('/api/auth/providers')
+      .then(res => res.ok ? res.json() : {})
+      .then((data: Record<string, unknown>) => setGoogleAvailable(Boolean(data.google)))
+      .catch(() => setGoogleAvailable(false))
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,12 +74,22 @@ export default function LoginClient() {
     })
 
     if (res?.error) {
-      setError('Thông tin đăng nhập không chính xác')
+      if (res.error === 'CONTACT_NOT_VERIFIED') {
+        setError('Tài khoản cần xác thực email và số điện thoại trước khi đăng nhập.')
+        if (loginIdentifier.includes('@')) setVerifyEmail(loginIdentifier)
+        setActiveTab('verify')
+      } else {
+        setError('Thông tin đăng nhập không chính xác')
+      }
       setLoading(false)
       return
     }
 
     router.push(callbackUrl)
+  }
+
+  const handleGoogleLogin = () => {
+    void signIn('google', { callbackUrl })
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -91,10 +121,17 @@ export default function LoginClient() {
         throw new Error(data.error || 'Không thể tạo tài khoản')
       }
 
-      toast.success('Đã tạo tài khoản chủ studio. Bạn có thể đăng nhập ngay.')
+      toast.success('Đã tạo tài khoản. Vui lòng nhập 2 mã xác thực đã gửi tới email và số điện thoại.')
+      if (data.deliveryErrors?.length) {
+        toast.warning('Một số kênh chưa gửi được mã. Bạn có thể bấm "Gửi lại mã" sau khi kiểm tra cấu hình email/SMS.')
+      }
+      setVerifyEmail(registerEmail)
+      setVerifyPhone(registerPhone)
+      if (data.devCodes?.email) setVerifyEmailCode(data.devCodes.email)
+      if (data.devCodes?.phone) setVerifyPhoneCode(data.devCodes.phone)
       setLoginIdentifier(registerEmail)
       setLoginPassword('')
-      setActiveTab('login')
+      setActiveTab('verify')
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -118,7 +155,15 @@ export default function LoginClient() {
         throw new Error(data.error || 'Không thể gửi yêu cầu khôi phục mật khẩu')
       }
 
-      toast.success('Nếu tài khoản tồn tại, một email khôi phục đã được gửi.')
+      if (forgotMethod === 'phone') {
+        setPhoneResetPending(true)
+        setPhoneResetIdentifier(forgotIdentifier)
+        if (data.devCode) setPhoneResetCode(data.devCode)
+        toast.success('Nếu số điện thoại đã xác thực, mã khôi phục đã được gửi.')
+      } else {
+        toast.success('Nếu tài khoản tồn tại, một email khôi phục đã được gửi.')
+      }
+
       if (data.resetUrl) {
         toast.success('Môi trường dev: đã tạo link khôi phục, mở từ response để test.')
       }
@@ -128,6 +173,117 @@ export default function LoginClient() {
       setForgotLoading(false)
     }
   }
+
+  const handleVerifyAccount = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setVerifyLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/auth/verify-contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: verifyEmail,
+          phone: verifyPhone,
+          emailCode: verifyEmailCode,
+          phoneCode: verifyPhoneCode,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Không thể xác thực tài khoản')
+
+      toast.success('Tài khoản đã được xác thực.')
+      if (registerPassword) {
+        const signInResult = await signIn('credentials', {
+          identifier: verifyEmail,
+          password: registerPassword,
+          redirect: false,
+        })
+        if (!signInResult?.error) {
+          router.push(callbackUrl)
+          return
+        }
+      }
+
+      setLoginIdentifier(verifyEmail)
+      setActiveTab('login')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setVerifyLoading(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    setResendLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: verifyEmail, phone: verifyPhone }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Không thể gửi lại mã xác thực')
+
+      if (data.devCodes?.email) setVerifyEmailCode(data.devCodes.email)
+      if (data.devCodes?.phone) setVerifyPhoneCode(data.devCodes.phone)
+      if (data.deliveryErrors?.length) {
+        toast.warning('Một số kênh chưa gửi được mã. Vui lòng kiểm tra cấu hình email/SMS rồi thử gửi lại.')
+      }
+      toast.success('Đã gửi lại mã xác thực.')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setResendLoading(false)
+    }
+  }
+
+  const handlePhoneReset = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (phoneResetPassword.length < 6) {
+      setError('Mật khẩu phải có ít nhất 6 ký tự')
+      return
+    }
+
+    if (phoneResetPassword !== phoneResetConfirmPassword) {
+      setError('Mật khẩu xác nhận không khớp')
+      return
+    }
+
+    setPhoneResetLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: phoneResetIdentifier,
+          code: phoneResetCode,
+          password: phoneResetPassword,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Không thể đổi mật khẩu')
+
+      toast.success('Đã đổi mật khẩu. Hãy đăng nhập lại.')
+      setLoginIdentifier(phoneResetIdentifier)
+      setPhoneResetPending(false)
+      setActiveTab('login')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setPhoneResetLoading(false)
+    }
+  }
+
+  const googleButtonTitle = googleAvailable
+    ? 'Đăng nhập hoặc tạo tài khoản bằng Google'
+    : 'Admin chưa cấu hình Google OAuth hoặc cấu hình chưa đủ Client ID và Client Secret.'
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.95),rgba(235,240,245,0.9)_45%,rgba(224,228,235,0.95))] px-4 py-10">
@@ -150,14 +306,41 @@ export default function LoginClient() {
           )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="login">Đăng nhập</TabsTrigger>
               <TabsTrigger value="register">Tạo tài khoản</TabsTrigger>
+              <TabsTrigger value="verify">Xác thực</TabsTrigger>
               <TabsTrigger value="forgot">Quên mật khẩu</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login" className="mt-6">
               <form onSubmit={handleLogin} className="space-y-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={handleGoogleLogin}
+                  disabled={!googleAvailable}
+                  title={googleButtonTitle}
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold">
+                    G
+                  </span>
+                  Đăng nhập bằng Google
+                </Button>
+                {!googleAvailable && (
+                  <p className="text-xs text-muted-foreground">
+                    Google OAuth chưa được cấu hình trong trang cài đặt Admin.
+                  </p>
+                )}
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">hoặc</span>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="login-identifier">Email / Username / Số điện thoại</Label>
                   <div className="relative">
@@ -203,6 +386,32 @@ export default function LoginClient() {
 
             <TabsContent value="register" className="mt-6">
               <form onSubmit={handleRegister} className="space-y-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={handleGoogleLogin}
+                  disabled={!googleAvailable}
+                  title={googleButtonTitle}
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold">
+                    G
+                  </span>
+                  Tạo tài khoản bằng Google
+                </Button>
+                {!googleAvailable && (
+                  <p className="text-xs text-muted-foreground">
+                    Google OAuth chưa được cấu hình trong trang cài đặt Admin.
+                  </p>
+                )}
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">hoặc</span>
+                  </div>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="register-name">Tên chủ studio</Label>
@@ -255,11 +464,47 @@ export default function LoginClient() {
               </form>
             </TabsContent>
 
+            <TabsContent value="verify" className="mt-6">
+              <form onSubmit={handleVerifyAccount} className="space-y-4">
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs leading-relaxed text-blue-900">
+                  Tài khoản tạo bằng email/số điện thoại cần xác thực cả hai kênh trước khi đăng nhập.
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="verify-email">Email đã đăng ký</Label>
+                    <Input id="verify-email" type="email" value={verifyEmail} onChange={(e) => setVerifyEmail(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="verify-phone">Số điện thoại đã đăng ký</Label>
+                    <Input id="verify-phone" value={verifyPhone} onChange={(e) => setVerifyPhone(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="verify-email-code">Mã email</Label>
+                    <Input id="verify-email-code" inputMode="numeric" value={verifyEmailCode} onChange={(e) => setVerifyEmailCode(e.target.value)} placeholder="6 chữ số" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="verify-phone-code">Mã điện thoại</Label>
+                    <Input id="verify-phone-code" inputMode="numeric" value={verifyPhoneCode} onChange={(e) => setVerifyPhoneCode(e.target.value)} placeholder="6 chữ số" required />
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <Button type="submit" className="gap-2" disabled={verifyLoading}>
+                    <ShieldCheck className="h-4 w-4" />
+                    {verifyLoading ? 'Đang xác thực...' : 'Xác thực tài khoản'}
+                  </Button>
+                  <Button type="button" variant="outline" className="gap-2" disabled={resendLoading} onClick={handleResendVerification}>
+                    <RotateCcw className="h-4 w-4" />
+                    {resendLoading ? 'Đang gửi...' : 'Gửi lại mã'}
+                  </Button>
+                </div>
+              </form>
+            </TabsContent>
+
             <TabsContent value="forgot" className="mt-6">
               <form onSubmit={handleForgot} className="space-y-4">
                 <div className="grid gap-2">
                   <Label>Phương thức</Label>
-                  <Select onValueChange={(v) => setForgotMethod(v as 'email' | 'phone')}>
+                  <Select value={forgotMethod} onValueChange={(v) => setForgotMethod(v as 'email' | 'phone')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn" />
                     </SelectTrigger>
@@ -271,10 +516,40 @@ export default function LoginClient() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="forgot-identifier">Email hoặc số điện thoại</Label>
-                  <Input id="forgot-identifier" value={forgotIdentifier} onChange={(e) => setForgotIdentifier(e.target.value)} required />
+                  <div className="relative">
+                    {forgotMethod === 'phone' ? (
+                      <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    )}
+                    <Input id="forgot-identifier" value={forgotIdentifier} onChange={(e) => setForgotIdentifier(e.target.value)} className="pl-10" required />
+                  </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={forgotLoading}>{forgotLoading ? 'Đang gửi...' : 'Gửi yêu cầu'}</Button>
               </form>
+              {phoneResetPending && (
+                <form onSubmit={handlePhoneReset} className="mt-6 space-y-4 rounded-lg border bg-muted/30 p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Đặt lại mật khẩu bằng mã điện thoại</p>
+                    <p className="text-xs text-muted-foreground">Nhập mã đã gửi tới số điện thoại và mật khẩu mới.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone-reset-code">Mã khôi phục</Label>
+                    <Input id="phone-reset-code" inputMode="numeric" value={phoneResetCode} onChange={(e) => setPhoneResetCode(e.target.value)} required />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="phone-reset-password">Mật khẩu mới</Label>
+                      <Input id="phone-reset-password" type="password" value={phoneResetPassword} onChange={(e) => setPhoneResetPassword(e.target.value)} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone-reset-confirm-password">Nhập lại mật khẩu</Label>
+                      <Input id="phone-reset-confirm-password" type="password" value={phoneResetConfirmPassword} onChange={(e) => setPhoneResetConfirmPassword(e.target.value)} required />
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={phoneResetLoading}>{phoneResetLoading ? 'Đang lưu...' : 'Đổi mật khẩu'}</Button>
+                </form>
+              )}
             </TabsContent>
           </Tabs>
         </div>

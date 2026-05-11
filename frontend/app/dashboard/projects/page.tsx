@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ProjectsTable } from '@/components/projects-table'
 import { NewProjectSheetButton } from '@/components/new-project-sheet-button'
+import { SharedCloudinaryNotice } from '@/components/cloudinary-usage-notice'
 import { TableSkeleton } from '@/components/skeletons'
 
 export default function ProjectsPage() {
@@ -34,6 +35,8 @@ export default function ProjectsPage() {
         <NewProjectSheetButton className="shrink-0" />
       </div>
 
+      <SharedCloudinaryNotice />
+
       {loading ? (
         <TableSkeleton />
       ) : (
@@ -42,4 +45,3 @@ export default function ProjectsPage() {
     </div>
   )
 }
-

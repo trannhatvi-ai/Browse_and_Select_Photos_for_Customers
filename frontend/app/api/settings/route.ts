@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { getCloudinaryUsageStatusForSettings } from '@/lib/cloudinary-usage-status'
 import { normalizeAdminIntegrationConfig } from '@/lib/notifications'
 
 export async function GET() {
@@ -21,9 +22,12 @@ export async function GET() {
     })
   }
 
+  const cloudinaryUsage = await getCloudinaryUsageStatusForSettings(settings, sessionUser.role)
+
   const payload: any = {
     ...settings,
-    userRole: sessionUser.role
+    userRole: sessionUser.role,
+    ...cloudinaryUsage,
   }
 
   if (sessionUser.role === 'ADMIN') {

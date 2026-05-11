@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { prisma } from '@/lib/db'
-import { queueEmail } from '@/lib/email'
+import {
+  PASSWORD_RESET_CODE_TTL_MS,
+  generateOtpCode,
+  getDevCodePayload,
+  hashOtpCode,
+  normalizeEmail,
+  normalizePhone,
+} from '@/lib/auth-verification'
+import { sendPasswordResetEmail, sendPasswordResetSms } from '@/lib/account-messages'
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,7 +19,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const normalizedIdentifier = String(identifier).trim()
+    const normalizedIdentifier = method === 'phone'
+      ? normalizePhone(identifier)
+      : normalizeEmail(identifier)
     const where = method === 'phone'
       ? { phone: normalizedIdentifier }
       : { email: normalizedIdentifier }
@@ -19,8 +29,35 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.findFirst({ where })
 
     // Avoid leaking whether the account exists
-    if (!user || !user.email) {
-      return NextResponse.json({ success: true })
+    if (!user) {
+      return NextResponse.json({ success: true, mode: method === 'phone' ? 'phone-code' : 'email-link' })
+    }
+
+    if (method === 'phone') {
+      if (!user.phone || !user.phoneVerifiedAt) {
+        return NextResponse.json({ success: true, mode: 'phone-code' })
+      }
+
+      const code = generateOtpCode()
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordResetCodeHash: hashOtpCode(code),
+          passwordResetCodeExpires: new Date(Date.now() + PASSWORD_RESET_CODE_TTL_MS),
+        },
+      })
+
+      await sendPasswordResetSms(user.phone, code)
+
+      return NextResponse.json({
+        success: true,
+        mode: 'phone-code',
+        devCode: getDevCodePayload(code),
+      })
+    }
+
+    if (!user.email) {
+      return NextResponse.json({ success: true, mode: 'email-link' })
     }
 
     const token = crypto.randomBytes(32).toString('hex')
@@ -37,21 +74,11 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const resetUrl = `${appUrl}/reset-password?token=${token}`
 
-    await queueEmail({
-      to: user.email,
-      subject: 'Khôi phục mật khẩu Studio',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Yêu cầu khôi phục mật khẩu</h2>
-          <p>Bạn có thể đặt lại mật khẩu bằng nút bên dưới:</p>
-          <p><a href="${resetUrl}" style="display:inline-block;background:#111;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;">Đặt lại mật khẩu</a></p>
-          <p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
-        </div>
-      `,
-    })
+    await sendPasswordResetEmail(user.email, resetUrl)
 
     return NextResponse.json({
       success: true,
+      mode: 'email-link',
       resetUrl: process.env.NODE_ENV === 'production' ? undefined : resetUrl,
     })
   } catch (error) {
