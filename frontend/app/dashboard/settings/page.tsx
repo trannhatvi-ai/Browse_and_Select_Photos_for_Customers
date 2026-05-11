@@ -40,6 +40,29 @@ class SyncAIError extends Error {
   }
 }
 
+type CloudinaryAccountItem = {
+  id: string
+  label: string
+  cloudName: string
+  apiKey: string
+  enabled: boolean
+  usedBytes: number
+  limitBytes: number
+  lastCheckedAt?: string | null
+}
+
+function formatBytes(bytes: number) {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let value = bytes
+  let index = 0
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024
+    index += 1
+  }
+  return `${Number(value.toFixed(2))} ${units[index]}`
+}
+
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -56,6 +79,8 @@ export default function SettingsPage() {
   const [cloudinaryCloudName, setCloudinaryCloudName] = useState('')
   const [cloudinaryApiKey, setCloudinaryApiKey] = useState('')
   const [cloudinaryApiSecret, setCloudinaryApiSecret] = useState('')
+  const [cloudinaryAccounts, setCloudinaryAccounts] = useState<CloudinaryAccountItem[]>([])
+  const [savingCloudinaryAccount, setSavingCloudinaryAccount] = useState(false)
   const [showCloudinarySecret, setShowCloudinarySecret] = useState(false)
   const [allowSharedCloudinary, setAllowSharedCloudinary] = useState(true)
   const [adminSharedCloudinaryAvailable, setAdminSharedCloudinaryAvailable] = useState(false)
@@ -109,6 +134,15 @@ export default function SettingsPage() {
     } catch {}
   }
 
+  const fetchCloudinaryAccounts = async () => {
+    try {
+      const res = await fetch('/api/settings/cloudinary/accounts')
+      if (!res.ok) return
+      const data = await res.json()
+      setCloudinaryAccounts(Array.isArray(data.accounts) ? data.accounts : [])
+    } catch {}
+  }
+
   useEffect(() => {
     if (userRole !== 'ADMIN') return
     
@@ -156,10 +190,11 @@ export default function SettingsPage() {
         setUserRole(data.userRole || '')
         setLoading(false)
       })
+    void fetchCloudinaryAccounts()
   }, [])
 
-  const hasCompleteStudioCloudinary = [cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret]
-    .every(value => value.trim().length > 0)
+  const hasCompleteStudioCloudinary = cloudinaryAccounts.length > 0 ||
+    [cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret].every(value => value.trim().length > 0)
   const isUsingSharedCloudinary = userRole !== 'ADMIN' && adminSharedCloudinaryAvailable && !hasCompleteStudioCloudinary
   const googleRedirectUri = `${appOrigin || 'http://localhost:3000'}/api/auth/callback/google`
 
@@ -282,6 +317,79 @@ export default function SettingsPage() {
   }
 
   if (loading) return <div className="p-8">Đang tải cấu hình...</div>
+
+  const handleAddCloudinaryAccount = async () => {
+    setSavingCloudinaryAccount(true)
+    try {
+      const res = await fetch('/api/settings/cloudinary/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: cloudinaryCloudName,
+          cloudinaryCloudName,
+          cloudinaryApiKey,
+          cloudinaryApiSecret,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (data.migrationRequired) {
+          toast.error('Chưa tạo bảng CloudinaryAccount. Hãy chạy Prisma migration rồi thử lại.')
+          return
+        }
+        toast.error(data.error || 'Không thể thêm Cloudinary')
+        return
+      }
+
+      setCloudinaryAccounts((items) => [...items, data.account])
+      setCloudinaryCloudName('')
+      setCloudinaryApiKey('')
+      setCloudinaryApiSecret('')
+      toast.success('Đã thêm Cloudinary vào pool')
+    } catch {
+      toast.error('Lỗi kết nối server')
+    } finally {
+      setSavingCloudinaryAccount(false)
+    }
+  }
+
+  const handleToggleCloudinaryAccount = async (account: CloudinaryAccountItem) => {
+    const res = await fetch('/api/settings/cloudinary/accounts', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: account.id, enabled: !account.enabled }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setCloudinaryAccounts((items) => items.map((item) => item.id === account.id ? data.account : item))
+    } else {
+      const data = await res.json().catch(() => null)
+      if (data?.migrationRequired) {
+        toast.error('Chưa tạo bảng CloudinaryAccount. Hãy chạy Prisma migration rồi thử lại.')
+        return
+      }
+      toast.error('Không thể cập nhật Cloudinary')
+    }
+  }
+
+  const handleDeleteCloudinaryAccount = async (account: CloudinaryAccountItem) => {
+    const res = await fetch('/api/settings/cloudinary/accounts', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: account.id }),
+    })
+    if (res.ok) {
+      setCloudinaryAccounts((items) => items.filter((item) => item.id !== account.id))
+      toast.success('Đã xoá Cloudinary khỏi pool')
+    } else {
+      const data = await res.json().catch(() => null)
+      if (data?.migrationRequired) {
+        toast.error('Chưa tạo bảng CloudinaryAccount. Hãy chạy Prisma migration rồi thử lại.')
+        return
+      }
+      toast.error('Không thể xoá Cloudinary')
+    }
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -742,6 +850,40 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+            {cloudinaryAccounts.length > 0 && (
+              <div className="space-y-2">
+                <Label>Cloudinary pool</Label>
+                <div className="space-y-2">
+                  {cloudinaryAccounts.map((account) => {
+                    const remaining = Math.max(0, account.limitBytes - account.usedBytes)
+                    return (
+                      <div key={account.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{account.label || account.cloudName}</p>
+                            <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">{account.cloudName}</span>
+                            <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                              {account.enabled ? 'Đang bật' : 'Đang tắt'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Đã dùng {formatBytes(account.usedBytes)} / {formatBytes(account.limitBytes)} · còn {formatBytes(remaining)}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={() => handleToggleCloudinaryAccount(account)}>
+                            {account.enabled ? 'Tắt' : 'Bật'}
+                          </Button>
+                          <Button type="button" variant="outline" size="icon" onClick={() => handleDeleteCloudinaryAccount(account)} aria-label="Xoá Cloudinary">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="cloud-name">Cloud Name</Label>
               <Input id="cloud-name" value={cloudinaryCloudName} onChange={(e) => setCloudinaryCloudName(e.target.value)} placeholder="your_cloud_name" />
@@ -778,6 +920,10 @@ export default function SettingsPage() {
             <Button type="button" variant="outline" onClick={handleTestCloudinary} disabled={testingCloudinary} className="gap-2">
               {testingCloudinary ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
               {testingCloudinary ? 'Đang test...' : 'Test Cloudinary'}
+            </Button>
+            <Button type="button" onClick={handleAddCloudinaryAccount} disabled={savingCloudinaryAccount} className="gap-2">
+              {savingCloudinaryAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+              {savingCloudinaryAccount ? 'Đang thêm...' : 'Thêm vào Cloudinary pool'}
             </Button>
           </CardContent>
         </Card>

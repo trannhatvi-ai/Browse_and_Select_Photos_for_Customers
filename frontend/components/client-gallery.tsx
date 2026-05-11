@@ -214,8 +214,11 @@ export function ClientGallery({ token }: { token?: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_id: projectData.id, query, top_k: 50 }),
       })
-      if (!res.ok) throw new Error()
       const data = await res.json()
+      if (!res.ok) {
+        const message = data?.detail || data?.error || 'Không tìm thấy kết quả.'
+        throw new Error(message)
+      }
       console.log('[semantic search] qdrant response', data)
       const getFileId = (url: string) => url ? url.split('/').pop()?.split('.')[0] || '' : ''
       const returnedScoreMap = new Map(data.results?.map((r: any) => [getFileId(r.image_url || r.metadata?.original_url), r.score]) || [])
@@ -239,7 +242,11 @@ export function ClientGallery({ token }: { token?: string }) {
       } else {
         setSemanticAlert(null)
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        setSemanticAlert({ variant: 'error', title: 'Lá»—i', description: error.message })
+        return
+      }
       setSemanticAlert({ variant: 'error', title: 'Lỗi', description: 'Không tìm thấy kết quả.' })
     } finally {
       setSemanticLoading(false)

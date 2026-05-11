@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { isMissingCloudinaryAccountTableError, selectBestCloudinaryAccount } from '@/lib/cloudinary-accounts'
 
 export interface CloudinaryCredentials {
   cloud_name: string
@@ -62,7 +63,57 @@ async function getAdminCloudinaryCredentials() {
   return credentialsFromSettings(adminSettings) || credentialsFromEnv()
 }
 
+async function getEnabledCloudinaryAccountCountForUser(userId: string) {
+  return (prisma as any).cloudinaryAccount.count({
+    where: { userId, enabled: true },
+  }).catch((error: unknown) => {
+    if (!isMissingCloudinaryAccountTableError(error)) {
+      console.error('Cloudinary account count failed:', error)
+    }
+    return 0
+  })
+}
+
+async function getEnabledAdminCloudinaryAccounts() {
+  return (prisma as any).cloudinaryAccount.findMany({
+    where: { user: { role: 'ADMIN' }, enabled: true },
+    orderBy: { createdAt: 'asc' },
+  }).catch((error: unknown) => {
+    if (!isMissingCloudinaryAccountTableError(error)) {
+      console.error('Admin Cloudinary account lookup failed:', error)
+    }
+    return []
+  })
+}
+
+async function getBestPoolCredentialsForUser(userId: string): Promise<CloudinaryCredentials | null> {
+  const account = selectBestCloudinaryAccount(await (prisma as any).cloudinaryAccount.findMany({
+    where: { userId, enabled: true },
+    orderBy: { createdAt: 'asc' },
+  }).catch((error: unknown) => {
+    if (!isMissingCloudinaryAccountTableError(error)) {
+      console.error('Cloudinary account lookup failed:', error)
+    }
+    return []
+  }))
+
+  return account
+    ? { cloud_name: account.cloud_name, api_key: account.api_key, api_secret: account.api_secret }
+    : null
+}
+
+async function getBestAdminPoolCredentials(): Promise<CloudinaryCredentials | null> {
+  const account = selectBestCloudinaryAccount(await getEnabledAdminCloudinaryAccounts())
+
+  return account
+    ? { cloud_name: account.cloud_name, api_key: account.api_key, api_secret: account.api_secret }
+    : null
+}
+
 export async function getCloudinaryCredentialsForUser(userId: string): Promise<CloudinaryCredentials> {
+  const ownPoolCredentials = await getBestPoolCredentialsForUser(userId)
+  if (ownPoolCredentials) return ownPoolCredentials
+
   const settings = await prisma.settings.findUnique({
     where: { userId },
     select: {
@@ -78,7 +129,7 @@ export async function getCloudinaryCredentialsForUser(userId: string): Promise<C
 
   // Nếu không có cấu hình riêng, mặc định dùng của Admin
   // Lưu ý: getCloudinaryCredentialsForUser luôn fallback về Admin để đảm bảo các project cũ vẫn hoạt động
-  const adminCredentials = await getAdminCloudinaryCredentials()
+  const adminCredentials = await getBestAdminPoolCredentials() || await getAdminCloudinaryCredentials()
   return adminCredentials || { cloud_name: '', api_key: '', api_secret: '' }
 }
 
@@ -108,6 +159,9 @@ export async function validateExistingProjectCloudinarySettings(userId: string):
   })
 
   if (credentialsFromSettings(settings)) return { isConfigured: true }
+  if (await getEnabledCloudinaryAccountCountForUser(userId)) return { isConfigured: true }
+  if (await getEnabledCloudinaryAccountCountForUser(userId)) return { isConfigured: true }
+  if ((await getEnabledAdminCloudinaryAccounts()).length > 0) return { isConfigured: true }
   if (await getAdminCloudinaryCredentials()) return { isConfigured: true }
 
   const missing = missingCredentials(settings)
@@ -140,7 +194,7 @@ export async function validateUserCloudinarySettings(userId: string): Promise<{ 
   })
 
   if (user?.role === 'ADMIN') {
-    return { isConfigured: !!(await getAdminCloudinaryCredentials()) }
+    return { isConfigured: !!(await getBestAdminPoolCredentials() || await getAdminCloudinaryCredentials()) }
   }
 
   // 2. Nếu không có cấu hình riêng, kiểm tra xem Admin có cho phép dùng chung không
@@ -150,7 +204,7 @@ export async function validateUserCloudinarySettings(userId: string): Promise<{ 
 
   if (isSharedAllowed) {
     // Nếu cho phép dùng chung, kiểm tra xem Admin đã cấu hình trong settings hoặc env chưa
-    return { isConfigured: !!(credentialsFromSettings(adminSettings) || credentialsFromEnv()) }
+    return { isConfigured: !!((await getEnabledAdminCloudinaryAccounts()).length > 0 || credentialsFromSettings(adminSettings) || credentialsFromEnv()) }
   }
 
   // 3. Nếu không cho phép dùng chung và user chưa có cấu hình riêng

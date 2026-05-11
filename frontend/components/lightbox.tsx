@@ -34,6 +34,7 @@ export function Lightbox({
   const [lastTap, setLastTap] = useState(0)
   const [dragOffset, setDragOffset] = useState(0)
   const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [showSelectHint, setShowSelectHint] = useState(false)
 
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -76,6 +77,12 @@ export function Lightbox({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
+      setShowSelectHint(true)
+      const timer = window.setTimeout(() => setShowSelectHint(false), 4200)
+      return () => {
+        window.clearTimeout(timer)
+        document.body.style.overflow = ''
+      }
     } else {
       document.body.style.overflow = ''
     }
@@ -97,8 +104,15 @@ export function Lightbox({
     const now = Date.now()
     if (now - lastTap < 300) {
       onSelect(currentPhoto.id)
+      setShowSelectHint(false)
     }
     setLastTap(now)
+  }
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onSelect(currentPhoto.id)
+    setShowSelectHint(false)
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -246,6 +260,7 @@ export function Lightbox({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onMouseDown={handleMouseDown}
+        onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
       >
         <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
@@ -288,6 +303,15 @@ export function Lightbox({
           />
         </div>
       </div>
+
+      {showSelectHint && (
+        <div className="pointer-events-none absolute left-1/2 top-20 z-[55] -translate-x-1/2 rounded-full border border-white/15 bg-black/45 px-4 py-2 text-sm font-medium text-white shadow-2xl backdrop-blur-md sm:top-6">
+          <span className="inline-flex items-center gap-2">
+            <Heart className="h-4 w-4" />
+            Nhấp đúp để chọn ảnh
+          </span>
+        </div>
+      )}
 
       {/* Bottom bar */}
       <div className="absolute bottom-0 inset-x-0 flex items-center justify-between bg-gradient-to-t from-black to-transparent p-4 pt-20 pb-6 pointer-events-none">

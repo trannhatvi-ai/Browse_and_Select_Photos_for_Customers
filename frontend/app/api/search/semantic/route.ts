@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildBackendUrl } from '@/lib/backend-api'
 
+function parseBackendBody(text: string, fallbackError: string) {
+  if (!text) return null
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return {
+      error: fallbackError,
+      detail: text.slice(0, 1000),
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
   const payload = await request.json()
 
@@ -14,7 +27,20 @@ export async function POST(request: NextRequest) {
     })
 
     const text = await backendResponse.text()
-    const data = text ? JSON.parse(text) : null
+    const data = parseBackendBody(
+      text,
+      backendResponse.ok
+        ? 'Semantic search backend returned a non-JSON response.'
+        : 'Semantic search backend returned an error.'
+    )
+
+    if (!backendResponse.ok) {
+      console.error('Semantic search backend error:', {
+        status: backendResponse.status,
+        body: data,
+      })
+    }
+
     return NextResponse.json(data, { status: backendResponse.status })
   } catch (error: any) {
     return NextResponse.json(

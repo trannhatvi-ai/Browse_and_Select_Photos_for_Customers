@@ -24,6 +24,9 @@ export function StatsCards({ stats }: StatsCardsProps) {
       .finally(() => setCloudLoading(false))
   }, [])
 
+  const cloudUsageTitle = cloudUsage?.modeLabel || 'Dung lượng Cloudinary'
+  const cloudUsageMeta = cloudUsage?.sourceLabel
+
   const cards = [
     {
       label: 'Tổng show chụp',
@@ -108,6 +111,11 @@ export function StatsCards({ stats }: StatsCardsProps) {
                     cloudUsage && <Progress value={cloudUsage.percentage} className="h-2" />
                   )}
                 </div>
+                {!cloudLoading && cloudUsageMeta && (
+                  <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+                    {cloudUsageTitle} · {cloudUsageMeta}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -158,6 +166,10 @@ export function StatsCards({ stats }: StatsCardsProps) {
                     <span className={cloudUsage.percentage > 80 ? 'font-medium text-red-500' : ''}>{cloudUsage.percentage}%</span>
                   </div>
                   <Progress value={cloudUsage.percentage} className="h-1.5" />
+                  <div className="space-y-0.5 text-xs text-muted-foreground">
+                    <p>{cloudUsageTitle}</p>
+                    {cloudUsageMeta && <p>{cloudUsageMeta}</p>}
+                  </div>
                 </div>
               )
             )}

@@ -26,6 +26,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -65,6 +67,42 @@ function formatDate(dateString: string) {
 }
 
 type SortKey = keyof Project
+type ExportFormat = 'txt' | 'csv' | 'ps1'
+
+const exportOptions: Array<{
+  format: ExportFormat
+  label: string
+  description: string
+  extension: string
+}> = [
+  {
+    format: 'txt',
+    label: 'TXT - lọc nhanh',
+    description: 'Mỗi dòng một tên file, hợp để tìm trong folder local.',
+    extension: 'txt',
+  },
+  {
+    format: 'csv',
+    label: 'CSV - kèm ghi chú',
+    description: 'Có filename, comment và originalUrl để studio đối soát.',
+    extension: 'csv',
+  },
+  {
+    format: 'ps1',
+    label: 'Copy-selected PowerShell',
+    description: 'Đặt vào folder ảnh gốc để copy ảnh đã chọn sang SELECTED.',
+    extension: 'ps1',
+  },
+]
+
+function safeDownloadName(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    || 'project'
+}
 
 export function ProjectsTable({ projects: initialProjects, onRefresh }: ProjectsTableProps) {
   const router = useRouter()
@@ -77,6 +115,32 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
   // Desktop-only state
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'eventDate', direction: 'desc' })
+
+  const handleDownloadExport = async (project: any, format: ExportFormat) => {
+    if (exportLoadingIds.includes(project.id)) return
+
+    const option = exportOptions.find((item) => item.format === format)
+    setExportLoadingIds(prev => [...prev, project.id])
+
+    try {
+      const res = await fetch(`/api/projects/${project.id}/export?format=${format}`)
+      if (!res.ok) return toast.error('Không thể tải danh sách ảnh đã chọn!')
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const suffix = format === 'ps1' ? '_copy-selected.ps1' : `.${option?.extension ?? format}`
+      a.href = url
+      a.download = `Selected_Photos_${safeDownloadName(project.clientName)}${suffix}`
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success(format === 'ps1' ? 'Đã tải script copy ảnh!' : 'Đã tải danh sách ảnh đã chọn!')
+    } catch (e) {
+      toast.error('Lỗi khi tải xuống')
+    } finally {
+      setExportLoadingIds(prev => prev.filter(id => id !== project.id))
+    }
+  }
 
   // Filter & Sort
   const processedProjects = useMemo(() => {
@@ -307,36 +371,35 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                         >
                           <LinkIcon className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="default" size="icon"
-                          className="h-8 w-8 border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
-                          title="Tải danh sách ảnh khách chọn"
-                          onClick={async () => {
-                            if (exportLoadingIds.includes(project.id)) return
-                            setExportLoadingIds(prev => [...prev, project.id])
-                            try {
-                              const res = await fetch(`/api/projects/${project.id}/export`)
-                              if (!res.ok) return toast.error('Không có ảnh nào được chọn!')
-                              const blob = await res.blob()
-                              const url = window.URL.createObjectURL(blob)
-                              const a = document.createElement('a')
-                              a.href = url
-                              a.download = `Selected_Photos_${project.clientName}.txt`
-                              a.click()
-                              toast.success('Đã tải xuống danh sách!')
-                            } catch (e) {
-                              toast.error('Lỗi khi tải xuống')
-                            } finally {
-                              setExportLoadingIds(prev => prev.filter(id => id !== project.id))
-                            }
-                          }}
-                        >
-                          {exportLoadingIds.includes(project.id) ? (
-                            <div className="h-4 w-4 rounded-full border-b-2 border-white animate-spin" />
-                          ) : (
-                            <Download className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="default" size="icon"
+                              className="h-8 w-8 border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
+                              title="Tải file kết quả ảnh khách chọn"
+                            >
+                              {exportLoadingIds.includes(project.id) ? (
+                                <div className="h-4 w-4 rounded-full border-b-2 border-white animate-spin" />
+                              ) : (
+                                <Download className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-72">
+                            <DropdownMenuLabel>Chọn định dạng tải xuống</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {exportOptions.map((option) => (
+                              <DropdownMenuItem
+                                key={option.format}
+                                className="flex flex-col items-start gap-0.5"
+                                onClick={() => handleDownloadExport(project, option.format)}
+                              >
+                                <span className="font-medium">{option.label}</span>
+                                <span className="text-xs text-muted-foreground">{option.description}</span>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button
                           variant="outline"
                           size="sm"
@@ -423,37 +486,36 @@ export function ProjectsTable({ projects: initialProjects, onRefresh }: Projects
                     <Eye className="mr-1 h-3.5 w-3.5" /> Chi tiết
                   </Button>
 
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="h-10 px-3 text-xs flex-none border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
-                    aria-label="Tải danh sách"
-                    onClick={async () => {
-                      if (exportLoadingIds.includes(project.id)) return
-                      setExportLoadingIds(prev => [...prev, project.id])
-                      try {
-                        const res = await fetch(`/api/projects/${project.id}/export`)
-                        if (!res.ok) return toast.error('Không có ảnh nào được chọn!')
-                        const blob = await res.blob()
-                        const url = window.URL.createObjectURL(blob)
-                        const a = document.createElement('a')
-                        a.href = url
-                        a.download = `Selected_Photos_${project.clientName}.txt`
-                        a.click()
-                        toast.success('Đã tải xuống danh sách!')
-                      } catch (e) {
-                        toast.error('Lỗi khi tải xuống')
-                      } finally {
-                        setExportLoadingIds(prev => prev.filter(id => id !== project.id))
-                      }
-                    }}
-                  >
-                    {exportLoadingIds.includes(project.id) ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="h-10 px-3 text-xs flex-none border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
+                        aria-label="Tải file kết quả"
+                      >
+                        {exportLoadingIds.includes(project.id) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-72">
+                      <DropdownMenuLabel>Chọn định dạng tải xuống</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {exportOptions.map((option) => (
+                        <DropdownMenuItem
+                          key={option.format}
+                          className="flex flex-col items-start gap-0.5"
+                          onClick={() => handleDownloadExport(project, option.format)}
+                        >
+                          <span className="font-medium">{option.label}</span>
+                          <span className="text-xs text-muted-foreground">{option.description}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                   <Button
                     variant="outline"

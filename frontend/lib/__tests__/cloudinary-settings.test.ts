@@ -11,6 +11,10 @@ jest.mock('@/lib/db', () => ({
       findUnique: jest.fn(),
       findFirst: jest.fn(),
     },
+    cloudinaryAccount: {
+      count: jest.fn(),
+      findMany: jest.fn(),
+    },
     user: {
       findUnique: jest.fn(),
     },
@@ -26,6 +30,8 @@ const originalEnv = process.env
 describe('cloudinary settings', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockPrisma.cloudinaryAccount.count.mockResolvedValue(0)
+    mockPrisma.cloudinaryAccount.findMany.mockResolvedValue([])
     process.env = { ...originalEnv }
     delete process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
     delete process.env.CLOUDINARY_API_KEY

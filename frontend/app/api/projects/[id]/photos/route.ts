@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { buildPreviewUrl } from '@/lib/storage'
 import { buildBackendUrl } from '@/lib/backend-api'
-import { syncProjectPhotoAiContexts } from '@/lib/ai-context-sync'
-import { getCloudinaryCredentialsForProject, validateExistingProjectCloudinarySettings } from '@/lib/cloudinary-settings'
+import { validateExistingProjectCloudinarySettings } from '@/lib/cloudinary-settings'
+import {
+  getUploadCloudinaryAccountsForProject,
+  resolveCloudinaryAccountForPhoto,
+  type ResolvedCloudinaryAccount,
+} from '@/lib/cloudinary-accounts'
 import { v2 as cloudinary } from 'cloudinary'
 
 // Cấu hình Cloudinary
@@ -43,8 +47,17 @@ export async function POST(
     )
   }
   
-  const credentials = await getCloudinaryCredentialsForProject(projectId)
-  cloudinary.config(credentials)
+  const cloudinaryAccounts = await getUploadCloudinaryAccountsForProject(projectId)
+  if (cloudinaryAccounts.length === 0) {
+    return NextResponse.json(
+      {
+        error: 'Cloudinary not configured',
+        message: 'Vui lòng cấu hình ít nhất một Cloudinary trước khi upload ảnh.',
+        configUrl: '/dashboard/settings'
+      },
+      { status: 400 }
+    )
+  }
 
   const formData = await req.formData()
   const files = formData.getAll('files') as File[]
@@ -63,18 +76,36 @@ export async function POST(
       const buffer = Buffer.from(arrayBuffer)
 
       // Upload lên Cloudinary dưới dạng stream
-      const uploadResult = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-          {
-            folder: `proofing/${projectId}`,
-            resource_type: 'image',
-          },
-          (error, result) => {
-            if (error) reject(error)
-            else resolve(result)
-          }
-        ).end(buffer)
-      }) as any
+      let uploadResult: any = null
+      let selectedAccount: ResolvedCloudinaryAccount | null = null
+      let lastUploadError: unknown = null
+
+      for (const account of cloudinaryAccounts) {
+        try {
+          cloudinary.config(account)
+          uploadResult = await new Promise((resolve, reject) => {
+            cloudinary.uploader.upload_stream(
+              {
+                folder: `proofing/${projectId}`,
+                resource_type: 'image',
+              },
+              (error, result) => {
+                if (error) reject(error)
+                else resolve(result)
+              }
+            ).end(buffer)
+          }) as any
+          selectedAccount = account
+          break
+        } catch (error) {
+          lastUploadError = error
+          console.warn(`Cloudinary upload failed on ${account.cloudName}, trying next account:`, error)
+        }
+      }
+
+      if (!uploadResult || !selectedAccount) {
+        throw lastUploadError || new Error('Cloudinary upload failed')
+      }
 
       // Lưu vào Database
       const photo = await prisma.photo.create({
@@ -82,11 +113,13 @@ export async function POST(
           projectId,
           filename: file.name,
           originalUrl: uploadResult.public_id, // Lưu Public ID của Cloudinary
-          previewUrl: buildPreviewUrl(uploadResult.public_id, credentials.cloud_name),
+          previewUrl: buildPreviewUrl(uploadResult.public_id, selectedAccount.cloud_name),
           width: uploadResult.width,
           height: uploadResult.height,
           size: uploadResult.bytes,
-        },
+          cloudinaryAccountId: selectedAccount.id,
+          cloudinaryCloudName: selectedAccount.cloudName,
+        } as any,
       })
 
       uploadedPhotos.push(photo)
@@ -135,9 +168,6 @@ export async function DELETE(
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
   
-  const credentials = await getCloudinaryCredentialsForProject(projectId)
-  cloudinary.config(credentials)
-  
   try {
     const results = []
     const cancelledUrls = []
@@ -150,6 +180,8 @@ export async function DELETE(
 
         // Xóa trên Cloudinary (originalUrl chứa public_id)
         try {
+          const account = await resolveCloudinaryAccountForPhoto(project.createdBy, photo as any)
+          if (account) cloudinary.config(account)
           await cloudinary.uploader.destroy(photo.originalUrl)
         } catch (err) {
           console.error(`Cloudinary delete error for ${id}:`, err)

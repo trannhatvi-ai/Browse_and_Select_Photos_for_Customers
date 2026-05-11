@@ -38,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className="bg-background">
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased" suppressHydrationWarning>
         {children}
         <Toaster position="top-right" richColors />
         {process.env.NODE_ENV === 'production' && <Analytics />}

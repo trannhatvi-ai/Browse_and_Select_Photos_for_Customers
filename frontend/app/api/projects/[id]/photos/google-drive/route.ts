@@ -3,7 +3,8 @@ import { Readable } from 'node:stream'
 import { v2 as cloudinary } from 'cloudinary'
 import { prisma } from '@/lib/db'
 import { buildPreviewUrl } from '@/lib/storage'
-import { getCloudinaryCredentialsForProject, validateExistingProjectCloudinarySettings } from '@/lib/cloudinary-settings'
+import { validateExistingProjectCloudinarySettings } from '@/lib/cloudinary-settings'
+import { getUploadCloudinaryAccountForProject } from '@/lib/cloudinary-accounts'
 
 export const runtime = 'nodejs'
 
@@ -283,8 +284,15 @@ export async function POST(
           return
         }
 
-        const credentials = await getCloudinaryCredentialsForProject(projectId)
-        cloudinary.config(credentials)
+        const cloudinaryAccount = await getUploadCloudinaryAccountForProject(projectId)
+        if (!cloudinaryAccount) {
+          sendEvent(controller, {
+            type: 'error',
+            message: 'Vui lòng cấu hình ít nhất một Cloudinary trước khi tải ảnh.',
+          })
+          return
+        }
+        cloudinary.config(cloudinaryAccount)
 
         const targets = await resolveDriveTargets(urls)
         sendEvent(controller, {
@@ -325,11 +333,13 @@ export async function POST(
                 projectId,
                 filename,
                 originalUrl: uploadResult.public_id,
-                previewUrl: buildPreviewUrl(uploadResult.public_id, credentials.cloud_name),
+                previewUrl: buildPreviewUrl(uploadResult.public_id, cloudinaryAccount.cloud_name),
                 width: uploadResult.width,
                 height: uploadResult.height,
                 size: uploadResult.bytes,
-              },
+                cloudinaryAccountId: cloudinaryAccount.id,
+                cloudinaryCloudName: cloudinaryAccount.cloudName,
+              } as any,
             })
 
             uploaded += 1

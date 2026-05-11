@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { v2 as cloudinary } from 'cloudinary'
 import { buildBackendUrl } from '@/lib/backend-api'
-import { getCloudinaryCredentialsForProject, validateUserCloudinarySettings } from '@/lib/cloudinary-settings'
+import { resolveCloudinaryAccountForPhoto, type ResolvedCloudinaryAccount } from '@/lib/cloudinary-accounts'
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -101,18 +101,26 @@ export async function DELETE(
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
   
-  const credentials = await getCloudinaryCredentialsForProject(id)
-  cloudinary.config(credentials)
-
   // 1. Lấy tất cả ảnh của show chụp
   const photos = await prisma.photo.findMany({
     where: { projectId: id },
-    select: { originalUrl: true }
+    select: {
+      originalUrl: true,
+      previewUrl: true,
+      cloudinaryAccountId: true,
+      cloudinaryCloudName: true,
+    } as any
   })
 
   // 2. Xóa từng ảnh trên Cloudinary
+  const cleanupAccounts = new Map<string, ResolvedCloudinaryAccount>()
   for (const photo of photos) {
     try {
+      const account = await resolveCloudinaryAccountForPhoto(project.createdBy, photo as any)
+      if (account) {
+        cloudinary.config(account)
+        cleanupAccounts.set(account.id || account.cloudName, account)
+      }
       await cloudinary.uploader.destroy(photo.originalUrl)
     } catch (err) {
       console.error('Cloudinary delete error:', err)
@@ -120,9 +128,12 @@ export async function DELETE(
   }
 
   // 3. Xóa toàn bộ folder show chụp trên Cloudinary (nếu có)
-  try {
-    await cloudinary.api.delete_folder(`proofing/${id}`)
-  } catch {}
+  for (const account of cleanupAccounts.values()) {
+    try {
+      cloudinary.config(account)
+      await cloudinary.api.delete_folder(`proofing/${id}`)
+    } catch {}
+  }
 
   // 4. Xóa show chụp trong DB (cascade sẽ xóa photos + selections)
   await prisma.project.delete({ where: { id } })

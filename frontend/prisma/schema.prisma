@@ -34,6 +34,7 @@ model User {
   schedules    ShootSchedule[]
   notificationLogs NotificationLog[]
   settings     Settings?
+  cloudinaryAccounts CloudinaryAccount[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
@@ -73,8 +74,13 @@ model Photo {
   comment     String?
   aiContext   Json?
   selections  Selection[]
+  cloudinaryAccountId String?
+  cloudinaryAccount   CloudinaryAccount? @relation(fields: [cloudinaryAccountId], references: [id], onDelete: SetNull)
+  cloudinaryCloudName String?
   uploadedAt  DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  @@index([cloudinaryAccountId])
 }
 
 model Selection {
@@ -128,6 +134,26 @@ model Settings {
   notificationConfig Json?
   adminIntegrationConfig Json?
   updatedAt       DateTime @updatedAt
+}
+
+model CloudinaryAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label         String
+  cloudName     String
+  apiKey        String
+  apiSecret     String
+  enabled       Boolean  @default(true)
+  usedBytes     BigInt   @default(0)
+  limitBytes    BigInt   @default(26843545600)
+  lastCheckedAt DateTime?
+  photos        Photo[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@unique([userId, cloudName])
 }
 
 model ShootSchedule {

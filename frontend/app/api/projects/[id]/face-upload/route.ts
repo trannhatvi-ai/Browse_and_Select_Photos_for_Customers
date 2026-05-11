@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v2 as cloudinary } from 'cloudinary'
-import { getCloudinaryCredentialsForProject, validateExistingProjectCloudinarySettings } from '@/lib/cloudinary-settings'
+import { validateExistingProjectCloudinarySettings } from '@/lib/cloudinary-settings'
+import { getUploadCloudinaryAccountForProject } from '@/lib/cloudinary-accounts'
 
 export async function POST(
   req: NextRequest,
@@ -31,8 +32,14 @@ export async function POST(
     return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
   }
 
-  const credentials = await getCloudinaryCredentialsForProject(projectId)
-  cloudinary.config(credentials)
+  const cloudinaryAccount = await getUploadCloudinaryAccountForProject(projectId)
+  if (!cloudinaryAccount) {
+    return NextResponse.json(
+      { error: 'Cloudinary not configured', message: 'Vui lòng cấu hình ít nhất một Cloudinary trước khi quét mặt.' },
+      { status: 400 }
+    )
+  }
+  cloudinary.config(cloudinaryAccount)
 
   try {
     const arrayBuffer = await file.arrayBuffer()

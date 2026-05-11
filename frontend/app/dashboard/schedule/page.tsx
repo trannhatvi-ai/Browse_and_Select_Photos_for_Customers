@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { buildSchedulesByDate } from '@/lib/schedule-calendar'
 
 type Channel = 'email' | 'telegram' | 'facebook'
 type ScheduleStatus = 'PLANNED' | 'CONFIRMED' | 'SHOOTING' | 'COMPLETED' | 'CANCELLED'
@@ -98,6 +99,8 @@ export default function SchedulePage() {
   const [saving, setSaving] = useState(false)
   const [runningReminders, setRunningReminders] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [dayDialogOpen, setDayDialogOpen] = useState(false)
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
   const [schedules, setSchedules] = useState<ShootSchedule[]>([])
   const [projects, setProjects] = useState<ProjectOption[]>([])
   const [defaultAdvanceMinutes, setDefaultAdvanceMinutes] = useState(1440)
@@ -136,13 +139,12 @@ export default function SchedulePage() {
 
   const monthDays = useMemo(() => buildMonthGrid(currentMonth), [currentMonth])
   const schedulesByDate = useMemo(() => {
-    const map = new Map<string, ShootSchedule[]>()
-    for (const schedule of schedules) {
-      const key = dateKey(new Date(schedule.startAt))
-      map.set(key, [...(map.get(key) || []), schedule])
-    }
-    return map
+    return buildSchedulesByDate(schedules)
   }, [schedules])
+  const selectedDaySchedules = useMemo(
+    () => selectedDay ? schedulesByDate.get(dateKey(selectedDay)) || [] : [],
+    [schedulesByDate, selectedDay]
+  )
 
   const upcomingSchedules = useMemo(
     () => schedules
@@ -165,6 +167,20 @@ export default function SchedulePage() {
     setDialogOpen(true)
   }
 
+  const openCreateDialogForDay = (day: Date) => {
+    const base = createEmptyForm(defaultAdvanceMinutes)
+    const start = new Date(day)
+    start.setHours(9, 0, 0, 0)
+    setForm({
+      ...base,
+      startAt: toLocalInput(start.toISOString()),
+      endAt: toLocalInput(addMinutes(start, 120).toISOString()),
+      reminderAt: toLocalInput(addMinutes(start, -defaultAdvanceMinutes).toISOString()),
+    })
+    setDayDialogOpen(false)
+    setDialogOpen(true)
+  }
+
   const openEditDialog = (schedule: ShootSchedule) => {
     setForm({
       id: schedule.id,
@@ -180,6 +196,7 @@ export default function SchedulePage() {
       notificationChannels: schedule.notificationChannels?.length ? schedule.notificationChannels : ['email'],
       status: schedule.status,
     })
+    setDayDialogOpen(false)
     setDialogOpen(true)
   }
 
@@ -279,7 +296,13 @@ export default function SchedulePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={runDueReminders} disabled={runningReminders} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={runDueReminders}
+            disabled={runningReminders}
+            className="gap-2"
+            title="Gửi ngay các lịch đã tới thời điểm nhắc nhưng chưa gửi."
+          >
             {runningReminders ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
             Gửi nhắc đến hạn
             {dueReminderCount > 0 && <Badge className="ml-1">{dueReminderCount}</Badge>}
@@ -331,9 +354,12 @@ export default function SchedulePage() {
                     key={day.toISOString()}
                     type="button"
                     onClick={() => {
-                      const base = createEmptyForm(defaultAdvanceMinutes)
-                      setForm({ ...base, startAt: toLocalInput(day.toISOString()), reminderAt: toLocalInput(addMinutes(day, -defaultAdvanceMinutes).toISOString()) })
-                      setDialogOpen(true)
+                      if (items.length > 0) {
+                        setSelectedDay(day)
+                        setDayDialogOpen(true)
+                      } else {
+                        openCreateDialogForDay(day)
+                      }
                     }}
                     className={cn(
                       'min-h-24 rounded-lg border p-2 text-left transition-colors hover:bg-muted/50',
@@ -345,7 +371,7 @@ export default function SchedulePage() {
                     <div className="space-y-1">
                       {items.slice(0, 3).map(item => (
                         <div key={item.id} className="truncate rounded bg-sky-500/10 px-2 py-1 text-[10px] font-medium text-sky-800">
-                          {new Date(item.startAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} {item.title}
+                          {formatCalendarItemTime(item, day)} {item.title}
                         </div>
                       ))}
                       {items.length > 3 && <div className="text-[10px] text-muted-foreground">+{items.length - 3} lịch</div>}
@@ -480,6 +506,38 @@ export default function SchedulePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={dayDialogOpen} onOpenChange={setDayDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader className="text-left">
+            <DialogTitle>
+              Lịch ngày {selectedDay?.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </DialogTitle>
+            <DialogDescription>Xem nhanh các lịch trong ngày, sửa nội dung hoặc thêm lịch mới.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {selectedDaySchedules.map(schedule => (
+              <ScheduleRow
+                key={schedule.id}
+                schedule={schedule}
+                onEdit={() => openEditDialog(schedule)}
+                onDelete={() => deleteSchedule(schedule)}
+              />
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDayDialogOpen(false)}>Đóng</Button>
+            {selectedDay && (
+              <Button type="button" onClick={() => openCreateDialogForDay(selectedDay)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Thêm lịch ngày này
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -533,6 +591,25 @@ function ScheduleRow({ schedule, onEdit, onDelete }: { schedule: ShootSchedule; 
       )}
     </div>
   )
+}
+
+function formatCalendarItemTime(schedule: ShootSchedule, day: Date) {
+  const start = new Date(schedule.startAt)
+  const end = schedule.endAt ? new Date(schedule.endAt) : null
+  const dayId = dateKey(day)
+  const startId = dateKey(start)
+  const endId = end && !Number.isNaN(end.getTime()) ? dateKey(end) : startId
+
+  if (startId === endId) {
+    return start.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  }
+  if (dayId === startId) {
+    return start.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  }
+  if (dayId === endId && end) {
+    return `Đến ${end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+  }
+  return 'Đang diễn ra'
 }
 
 function createEmptyForm(advanceMinutes = 1440): ScheduleForm {
