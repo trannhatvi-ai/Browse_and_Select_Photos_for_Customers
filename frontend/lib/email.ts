@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import { getAdminIntegrationConfig } from '@/lib/notifications'
+import nodemailer from 'nodemailer'
 
 export interface EmailJobData {
   to: string
@@ -7,6 +8,16 @@ export interface EmailJobData {
   html: string
   from?: string
 }
+
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'yahoo.com',
+  'hotmail.com',
+  'outlook.com',
+  'live.com',
+  'icloud.com',
+])
 
 // Resend client - will be initialized with key from admin config or env
 let resend: { apiKey: string; client: Resend } | null = null
@@ -19,11 +30,19 @@ async function getResendSettings() {
     ? adminConfig.resend.fromEmail.trim()
     : process.env.EMAIL_FROM || 'Studio Pro <studiopro1008@gmail.com>'
 
-  if (!apiKey) {
-    throw new Error('No Resend API key configured in admin settings or .env')
+  // If Resend api key is configured prefer that. Otherwise allow SMTP fallback
+  const smtpHost = process.env.SMTP_HOST || ''
+  const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 0
+  const smtpUser = process.env.SMTP_USER || ''
+  const smtpPass = process.env.SMTP_PASS || ''
+
+  if (apiKey) return { apiKey, from }
+
+  if (smtpHost && smtpPort && smtpUser && smtpPass) {
+    return { smtp: { host: smtpHost, port: smtpPort, user: smtpUser, pass: smtpPass }, from }
   }
 
-  return { apiKey, from }
+  throw new Error('No Resend API key or SMTP config found. Set RESEND_API_KEY or SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS in env')
 }
 
 async function getResendClient(apiKey: string) {
@@ -31,6 +50,26 @@ async function getResendClient(apiKey: string) {
     resend = { apiKey, client: new Resend(apiKey) }
   }
   return resend.client
+}
+
+function extractEmailAddress(value: string) {
+  const match = value.match(/<([^>]+)>/)
+  return (match?.[1] || value).trim().toLowerCase()
+}
+
+function assertVerifiedSender(from: string) {
+  const email = extractEmailAddress(from)
+  const domain = email.split('@')[1]
+  if (!domain || PUBLIC_EMAIL_DOMAINS.has(domain)) {
+    throw new Error(
+      `Email người gửi "${from}" không dùng được với Resend. Hãy dùng email thuộc domain đã verify trong Resend, ví dụ: Studio Pro <no-reply@tenmiencuaban.com>.`
+    )
+  }
+}
+
+function normalizeResendError(error: any) {
+  if (!error) return 'Resend không gửi được email.'
+  return error.message || error.name || JSON.stringify(error)
 }
 
 // Email templates
@@ -146,17 +185,57 @@ export const templates = {
 
 // Send email directly through Resend
 export async function queueEmail(data: EmailJobData) {
-  await sendEmailDirect(data)
+  return sendEmailDirect(data)
 }
 
 async function sendEmailDirect(data: EmailJobData) {
   const settings = await getResendSettings()
   const { to, subject, html, from = settings.from } = data
-  const resendClient = await getResendClient(settings.apiKey)
-  await resendClient.emails.send({
-    from,
-    to,
-    subject,
-    html,
-  })
+  assertVerifiedSender(from)
+
+  // If Resend settings present, use Resend
+  if ((settings as any).apiKey) {
+    const resendClient = await getResendClient((settings as any).apiKey)
+    const result = await resendClient.emails.send({
+      from,
+      to,
+      subject,
+      html,
+    }) as any
+
+    if (result?.error) {
+      throw new Error(normalizeResendError(result.error))
+    }
+
+    return result?.data?.id || null
+  }
+
+  // Otherwise use SMTP via nodemailer
+  if ((settings as any).smtp) {
+    const smtp = (settings as any).smtp
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.port === 465, // true for 465, false for other ports
+      auth: {
+        user: smtp.user,
+        pass: smtp.pass,
+      },
+    })
+
+    const mail = await transporter.sendMail({
+      from,
+      to,
+      subject,
+      html,
+    })
+
+    if (!mail || !mail.messageId) {
+      throw new Error('SMTP failed to send email')
+    }
+
+    return mail.messageId
+  }
+
+  throw new Error('No email delivery method available')
 }

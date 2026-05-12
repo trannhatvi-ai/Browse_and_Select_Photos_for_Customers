@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { isExpired, normalizeEmail, normalizePhone, verifyOtpCode } from '@/lib/auth-verification'
+import { getPhoneLookupCandidates, isExpired, normalizeEmail, normalizePhone, verifyOtpCode } from '@/lib/auth-verification'
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.findFirst({
       where: {
         email: normalizedEmail,
-        phone: normalizedPhone,
+        phone: { in: getPhoneLookupCandidates(normalizedPhone) },
       },
     })
 

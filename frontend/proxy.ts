@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
-export default async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Allow public assets and auth routes
@@ -18,6 +18,13 @@ export default async function middleware(req: NextRequest) {
     const signInUrl = new URL('/login', req.url)
     signInUrl.searchParams.set('callbackUrl', req.url)
     return NextResponse.redirect(signInUrl)
+  }
+
+  const hasCompleteProfile = token.role === 'ADMIN' || token.profileComplete === true
+  if (!hasCompleteProfile) {
+    const completeProfileUrl = new URL('/complete-profile', req.url)
+    completeProfileUrl.searchParams.set('callbackUrl', req.url)
+    return NextResponse.redirect(completeProfileUrl)
   }
 
   // Admin-only area: block non-admins from /dashboard/users

@@ -78,6 +78,13 @@ type DriveImportItem = {
   message?: string
 }
 
+type AiTaskStatus = {
+  status?: string
+  percentage?: number
+  processed_count?: number
+  total_count?: number
+}
+
 function getStatusLabel(status: ProjectDetails['status']) {
   return status === 'DONE' ? 'Hoàn thành' : 'Khách đang chọn'
 }
@@ -124,6 +131,7 @@ export default function ProjectDetailPage() {
   } | null>(null)
   const [loadingStats, setLoadingStats] = useState(false)
   const [syncingAi, setSyncingAi] = useState(false)
+  const [aiTaskStatus, setAiTaskStatus] = useState<AiTaskStatus | null>(null)
   const [realProjectId, setRealProjectId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest')
@@ -138,6 +146,8 @@ export default function ProjectDetailPage() {
     aiStats.indexed_photos_qdrant >= aiStats.total_photos &&
     aiStats.total_photos > 0
   )
+  const aiSyncInProgress = aiTaskStatus?.status === 'indexing'
+  const aiSyncDisabled = loadingStats || syncingAi || aiSyncCompleted || aiSyncInProgress
   const aiSyncTooltip = aiSyncCompleted
     ? 'Tất cả ảnh đã sẵn sàng, không cần tạo ngữ cảnh nữa'
     : 'Tạo mô tả AI cho các ảnh mới'
@@ -156,6 +166,25 @@ export default function ProjectDetailPage() {
       console.error('Failed to fetch AI stats', error)
     } finally {
       setLoadingStats(false)
+    }
+  }
+
+  const fetchAiTaskStatus = async (idOverride?: string) => {
+    const idToUse = idOverride || realProjectId || projectId
+    if (!idToUse) return null
+    try {
+      const res = await fetch(`/api/ai-stats/tasks/index/${idToUse}`, { cache: 'no-store' })
+      if (res.status === 404) {
+        setAiTaskStatus(null)
+        return null
+      }
+      if (!res.ok) return null
+      const data = await res.json()
+      setAiTaskStatus(data)
+      return data as AiTaskStatus
+    } catch (error) {
+      console.error('Failed to fetch AI task status', error)
+      return null
     }
   }
 
@@ -180,6 +209,7 @@ export default function ProjectDetailPage() {
 
       // Lấy luôn stats khi load details, truyền ID thật vào luôn
       void fetchAiStats(data.id)
+      void fetchAiTaskStatus(data.id)
     } catch (error) {
       toast.error((error as Error).message)
     } finally {
@@ -190,6 +220,21 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     void fetchDetails()
   }, [projectId])
+
+  useEffect(() => {
+    const idToUse = realProjectId || projectId
+    if (!idToUse) return
+
+    const interval = window.setInterval(() => {
+      void fetchAiTaskStatus(idToUse).then((status) => {
+        if (status?.status === 'indexing') {
+          void fetchAiStats(idToUse)
+        }
+      })
+    }, aiSyncInProgress ? 3000 : 10000)
+
+    return () => window.clearInterval(interval)
+  }, [aiSyncInProgress, projectId, realProjectId])
 
   const selectedCount = useMemo(
     () => project?.photos?.filter((photo) => photo.selected).length ?? 0,
@@ -225,6 +270,40 @@ export default function ProjectDetailPage() {
     })),
     [photos]
   )
+
+  const handleStartAiSync = async () => {
+    if (!project || aiSyncCompleted || aiSyncInProgress) return
+
+    setSyncingAi(true)
+    try {
+      const idToUse = realProjectId || project.id
+      const res = await fetch(`/api/ai-stats/projects/${idToUse}/sync`, { method: 'POST' })
+      if (!res.ok) throw new Error('KhÃ´ng thá»ƒ báº¯t Ä‘áº§u táº¡o ngá»¯ cáº£nh AI')
+
+      const data = await res.json()
+      setAiTaskStatus({
+        status: data.status === 'already_processing' ? 'indexing' : 'indexing',
+        percentage: 0,
+        processed_count: 0,
+        total_count: data.queued_count,
+      })
+
+      if (data.status === 'already_processing') {
+        toast.info('Backend Ä‘ang táº¡o ngá»¯ cáº£nh AI cho show nÃ y')
+      } else {
+        toast.success(`ÄÃ£ báº¯t Ä‘áº§u táº¡o ngá»¯ cáº£nh cho ${data.queued_count} áº£nh!`)
+      }
+
+      setTimeout(() => {
+        void fetchAiStats(idToUse)
+        void fetchAiTaskStatus(idToUse)
+      }, 2000)
+    } catch (error) {
+      toast.error((error as Error).message || 'Lá»—i káº¿t ná»‘i!')
+    } finally {
+      setSyncingAi(false)
+    }
+  }
 
   const handleBulkDelete = async () => {
     if (!project || selectedIds.size === 0) return
@@ -620,23 +699,32 @@ export default function ProjectDetailPage() {
                       : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
                   )}
                   onClick={async () => {
-                    if (aiSyncCompleted) return
+                    if (aiSyncCompleted || aiSyncInProgress) return
                     setSyncingAi(true)
                     try {
                       const idToUse = realProjectId || project.id
                       const res = await fetch(`/api/ai-stats/projects/${idToUse}/sync`, { method: 'POST' })
                       if (res.ok) {
                         const data = await res.json()
+                        setAiTaskStatus({
+                          status: 'indexing',
+                          percentage: 0,
+                          processed_count: 0,
+                          total_count: data.queued_count,
+                        })
                         toast.success(`Đã bắt đầu tạo ngữ cảnh cho ${data.queued_count} ảnh!`)
-                        setTimeout(fetchAiStats, 2000)
+                        setTimeout(() => {
+                          void fetchAiStats(idToUse)
+                          void fetchAiTaskStatus(idToUse)
+                        }, 2000)
                       }
                     } catch (err) {} finally {
                       setSyncingAi(false)
                     }
                   }}
-                  disabled={loadingStats || syncingAi || aiSyncCompleted}
+                  disabled={aiSyncDisabled}
                 >
-                  {syncingAi ? (
+                  {syncingAi || aiSyncInProgress ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : aiSyncCompleted ? (
                     <CheckCircle2 className="h-4 w-4" />
@@ -827,23 +915,32 @@ export default function ProjectDetailPage() {
                       : 'bg-amber-500 text-white hover:bg-amber-600'
                   )}
                   onClick={async () => {
-                    if (aiSyncCompleted) return
+                    if (aiSyncCompleted || aiSyncInProgress) return
                     setSyncingAi(true)
                     try {
                       const idToUse = realProjectId || project.id
                       const res = await fetch(`/api/ai-stats/projects/${idToUse}/sync`, { method: 'POST' })
                       if (res.ok) {
                         const data = await res.json()
+                        setAiTaskStatus({
+                          status: 'indexing',
+                          percentage: 0,
+                          processed_count: 0,
+                          total_count: data.queued_count,
+                        })
                         toast.success(`Đã bắt đầu tạo ngữ cảnh cho ${data.queued_count} ảnh!`)
-                        setTimeout(fetchAiStats, 2000)
+                        setTimeout(() => {
+                          void fetchAiStats(idToUse)
+                          void fetchAiTaskStatus(idToUse)
+                        }, 2000)
                       }
                     } catch (err) {} finally {
                       setSyncingAi(false)
                     }
                   }}
-                  disabled={loadingStats || syncingAi || aiSyncCompleted}
+                  disabled={aiSyncDisabled}
                 >
-                  {syncingAi ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : aiSyncCompleted ? <CheckCircle2 className="h-5 w-5 mr-2" /> : <Sparkles className="h-5 w-5 mr-2" />}
+                  {syncingAi || aiSyncInProgress ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : aiSyncCompleted ? <CheckCircle2 className="h-5 w-5 mr-2" /> : <Sparkles className="h-5 w-5 mr-2" />}
                   {aiSyncCompleted ? 'Đã hoàn thành AI' : 'Tạo ngữ cảnh AI'}
                 </Button>
               </div>

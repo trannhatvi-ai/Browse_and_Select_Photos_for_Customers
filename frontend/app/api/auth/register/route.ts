@@ -3,6 +3,7 @@ import {
   CONTACT_VERIFICATION_TTL_MS,
   generateOtpCode,
   getDevCodePayload,
+  getPhoneLookupCandidates,
   hashOtpCode,
   normalizeEmail,
   normalizePhone,
@@ -26,13 +27,34 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Mật khẩu phải có ít nhất 6 ký tự' }, { status: 400 })
     }
 
+    const phoneOwner = await prisma.user.findFirst({
+      where: {
+        phone: { in: getPhoneLookupCandidates(normalizedPhone) },
+      },
+      select: { id: true },
+    })
+    if (phoneOwner) {
+      const owner = await prisma.user.findUnique({
+        where: { id: phoneOwner.id },
+        select: { email: true },
+      })
+      return Response.json(
+        { error: owner?.email ? `Số điện thoại này đã được liên kết với email ${owner.email}` : 'Số điện thoại đã được dùng cho tài khoản khác' },
+        { status: 409 }
+      )
+    }
+
     const existing = await prisma.user.findFirst({
       where: {
-        OR: [{ email: normalizedEmail }, { username: normalizedUsername }, { phone: normalizedPhone }],
+        OR: [
+          { email: normalizedEmail },
+          { username: normalizedUsername },
+        ],
       },
+      select: { email: true, username: true },
     })
     if (existing) {
-      return Response.json({ error: 'Email, username hoặc số điện thoại đã tồn tại' }, { status: 400 })
+      return Response.json({ error: 'Email hoặc username đã tồn tại' }, { status: 400 })
     }
 
     const hashed = await bcrypt.hash(password, 12)

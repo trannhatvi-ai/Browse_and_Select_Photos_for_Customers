@@ -8,7 +8,29 @@ export function normalizeEmail(email?: string | null) {
 }
 
 export function normalizePhone(phone?: string | null) {
-  return phone?.trim().replace(/[\s().-]/g, '') || ''
+  const compact = phone?.trim().replace(/[\s().-]/g, '') || ''
+  if (!compact) return ''
+
+  let local = ''
+  if (compact.startsWith('+84')) {
+    local = `0${compact.slice(3)}`
+  } else if (compact.startsWith('84')) {
+    local = `0${compact.slice(2)}`
+  } else {
+    local = compact
+  }
+
+  if (!/^0[35789]\d{8}$/.test(local)) return ''
+  return `+84${local.slice(1)}`
+}
+
+export function getPhoneLookupCandidates(phone?: string | null) {
+  const normalized = normalizePhone(phone)
+  if (!normalized) return []
+
+  const local = `0${normalized.slice(3)}`
+  const withoutPlus = normalized.slice(1)
+  return Array.from(new Set([normalized, local, withoutPlus]))
 }
 
 export function generateOtpCode() {

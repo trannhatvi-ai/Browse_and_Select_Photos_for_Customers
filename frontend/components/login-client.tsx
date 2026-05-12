@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Lock, Mail, Eye, EyeOff, Sparkles, Phone, ShieldCheck, RotateCcw } from 'lucide-react'
+import { ArrowRight, Lock, Mail, Eye, EyeOff, Sparkles, Phone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -37,20 +37,14 @@ export default function LoginClient() {
   const [showPassword, setShowPassword] = useState(false)
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('')
   const [googleAvailable, setGoogleAvailable] = useState(false)
-  const [verifyEmail, setVerifyEmail] = useState('')
-  const [verifyPhone, setVerifyPhone] = useState('')
-  const [verifyEmailCode, setVerifyEmailCode] = useState('')
-  const [verifyPhoneCode, setVerifyPhoneCode] = useState('')
-  const [verifyLoading, setVerifyLoading] = useState(false)
-  const [resendLoading, setResendLoading] = useState(false)
-
+  const [facebookAvailable, setFacebookAvailable] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
 
   useEffect(() => {
     const tab = searchParams.get('tab')
-    if (tab === 'register' || tab === 'forgot' || tab === 'login' || tab === 'verify') {
+    if (tab === 'register' || tab === 'forgot' || tab === 'login') {
       setActiveTab(tab)
     }
   }, [searchParams])
@@ -58,8 +52,14 @@ export default function LoginClient() {
   useEffect(() => {
     fetch('/api/auth/providers')
       .then(res => res.ok ? res.json() : {})
-      .then((data: Record<string, unknown>) => setGoogleAvailable(Boolean(data.google)))
-      .catch(() => setGoogleAvailable(false))
+      .then((data: Record<string, unknown>) => {
+        setGoogleAvailable(Boolean(data.google))
+        setFacebookAvailable(Boolean(data.facebook))
+      })
+      .catch(() => {
+        setGoogleAvailable(false)
+        setFacebookAvailable(false)
+      })
   }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -74,13 +74,7 @@ export default function LoginClient() {
     })
 
     if (res?.error) {
-      if (res.error === 'CONTACT_NOT_VERIFIED') {
-        setError('Tài khoản cần xác thực email và số điện thoại trước khi đăng nhập.')
-        if (loginIdentifier.includes('@')) setVerifyEmail(loginIdentifier)
-        setActiveTab('verify')
-      } else {
-        setError('Thông tin đăng nhập không chính xác')
-      }
+      setError('Thông tin đăng nhập không chính xác')
       setLoading(false)
       return
     }
@@ -90,6 +84,10 @@ export default function LoginClient() {
 
   const handleGoogleLogin = () => {
     void signIn('google', { callbackUrl })
+  }
+
+  const handleFacebookLogin = () => {
+    void signIn('facebook', { callbackUrl })
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -125,13 +123,9 @@ export default function LoginClient() {
       if (data.deliveryErrors?.length) {
         toast.warning('Một số kênh chưa gửi được mã. Bạn có thể bấm "Gửi lại mã" sau khi kiểm tra cấu hình email/SMS.')
       }
-      setVerifyEmail(registerEmail)
-      setVerifyPhone(registerPhone)
-      if (data.devCodes?.email) setVerifyEmailCode(data.devCodes.email)
-      if (data.devCodes?.phone) setVerifyPhoneCode(data.devCodes.phone)
       setLoginIdentifier(registerEmail)
       setLoginPassword('')
-      setActiveTab('verify')
+      setActiveTab('login')
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -171,73 +165,6 @@ export default function LoginClient() {
       setError((err as Error).message)
     } finally {
       setForgotLoading(false)
-    }
-  }
-
-  const handleVerifyAccount = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setVerifyLoading(true)
-    setError('')
-
-    try {
-      const res = await fetch('/api/auth/verify-contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: verifyEmail,
-          phone: verifyPhone,
-          emailCode: verifyEmailCode,
-          phoneCode: verifyPhoneCode,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Không thể xác thực tài khoản')
-
-      toast.success('Tài khoản đã được xác thực.')
-      if (registerPassword) {
-        const signInResult = await signIn('credentials', {
-          identifier: verifyEmail,
-          password: registerPassword,
-          redirect: false,
-        })
-        if (!signInResult?.error) {
-          router.push(callbackUrl)
-          return
-        }
-      }
-
-      setLoginIdentifier(verifyEmail)
-      setActiveTab('login')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setVerifyLoading(false)
-    }
-  }
-
-  const handleResendVerification = async () => {
-    setResendLoading(true)
-    setError('')
-
-    try {
-      const res = await fetch('/api/auth/resend-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: verifyEmail, phone: verifyPhone }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Không thể gửi lại mã xác thực')
-
-      if (data.devCodes?.email) setVerifyEmailCode(data.devCodes.email)
-      if (data.devCodes?.phone) setVerifyPhoneCode(data.devCodes.phone)
-      if (data.deliveryErrors?.length) {
-        toast.warning('Một số kênh chưa gửi được mã. Vui lòng kiểm tra cấu hình email/SMS rồi thử gửi lại.')
-      }
-      toast.success('Đã gửi lại mã xác thực.')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setResendLoading(false)
     }
   }
 
@@ -285,6 +212,10 @@ export default function LoginClient() {
     ? 'Đăng nhập hoặc tạo tài khoản bằng Google'
     : 'Admin chưa cấu hình Google OAuth hoặc cấu hình chưa đủ Client ID và Client Secret.'
 
+  const facebookButtonTitle = facebookAvailable
+    ? 'Dang nhap hoac tao tai khoan bang Facebook'
+    : 'Admin chua cau hinh Facebook OAuth hoac cau hinh chua du App ID va App Secret.'
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.95),rgba(235,240,245,0.9)_45%,rgba(224,228,235,0.95))] px-4 py-10">
       <div className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -306,11 +237,9 @@ export default function LoginClient() {
           )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Đăng nhập</TabsTrigger>
               <TabsTrigger value="register">Tạo tài khoản</TabsTrigger>
-              <TabsTrigger value="verify">Xác thực</TabsTrigger>
-              <TabsTrigger value="forgot">Quên mật khẩu</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login" className="mt-6">
@@ -328,9 +257,27 @@ export default function LoginClient() {
                   </span>
                   Đăng nhập bằng Google
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={handleFacebookLogin}
+                  disabled={!facebookAvailable}
+                  title={facebookButtonTitle}
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold">
+                    f
+                  </span>
+                  Dang nhap bang Facebook
+                </Button>
                 {!googleAvailable && (
                   <p className="text-xs text-muted-foreground">
                     Google OAuth chưa được cấu hình trong trang cài đặt Admin.
+                  </p>
+                )}
+                {!facebookAvailable && (
+                  <p className="text-xs text-muted-foreground">
+                    Facebook OAuth chua duoc cau hinh trong trang cai dat Admin.
                   </p>
                 )}
                 <div className="relative py-1">
@@ -381,6 +328,13 @@ export default function LoginClient() {
                 <Button type="submit" className="w-full gap-2" disabled={loading}>
                   {loading ? 'Đang xác thực...' : 'Đăng nhập'} <ArrowRight className="h-4 w-4" />
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('forgot')}
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Quên mật khẩu?
+                </button>
               </form>
             </TabsContent>
 
@@ -461,42 +415,6 @@ export default function LoginClient() {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={registerLoading}>{registerLoading ? 'Đang tạo...' : 'Tạo tài khoản'}</Button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="verify" className="mt-6">
-              <form onSubmit={handleVerifyAccount} className="space-y-4">
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs leading-relaxed text-blue-900">
-                  Tài khoản tạo bằng email/số điện thoại cần xác thực cả hai kênh trước khi đăng nhập.
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="verify-email">Email đã đăng ký</Label>
-                    <Input id="verify-email" type="email" value={verifyEmail} onChange={(e) => setVerifyEmail(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="verify-phone">Số điện thoại đã đăng ký</Label>
-                    <Input id="verify-phone" value={verifyPhone} onChange={(e) => setVerifyPhone(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="verify-email-code">Mã email</Label>
-                    <Input id="verify-email-code" inputMode="numeric" value={verifyEmailCode} onChange={(e) => setVerifyEmailCode(e.target.value)} placeholder="6 chữ số" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="verify-phone-code">Mã điện thoại</Label>
-                    <Input id="verify-phone-code" inputMode="numeric" value={verifyPhoneCode} onChange={(e) => setVerifyPhoneCode(e.target.value)} placeholder="6 chữ số" required />
-                  </div>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <Button type="submit" className="gap-2" disabled={verifyLoading}>
-                    <ShieldCheck className="h-4 w-4" />
-                    {verifyLoading ? 'Đang xác thực...' : 'Xác thực tài khoản'}
-                  </Button>
-                  <Button type="button" variant="outline" className="gap-2" disabled={resendLoading} onClick={handleResendVerification}>
-                    <RotateCcw className="h-4 w-4" />
-                    {resendLoading ? 'Đang gửi...' : 'Gửi lại mã'}
-                  </Button>
-                </div>
               </form>
             </TabsContent>
 

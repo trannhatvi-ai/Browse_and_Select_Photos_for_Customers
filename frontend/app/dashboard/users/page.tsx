@@ -42,6 +42,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { formatVietnamPhoneForDisplay } from '@/lib/phone-format'
 
 interface UserItem {
   id: string
@@ -101,6 +102,8 @@ export default function UsersPage() {
     )
   }, [users, search])
 
+  const displayPhone = (value: string | null) => formatVietnamPhoneForDisplay(value) || '-'
+
   const openCreate = () => {
     setEditingUser(null)
     setName('')
@@ -119,7 +122,7 @@ export default function UsersPage() {
     setName(user.name)
     setEmail(user.email)
     setUsername(user.username || '')
-    setPhone(user.phone || '')
+    setPhone(formatVietnamPhoneForDisplay(user.phone))
     setPassword('')
     setConfirmPassword('')
     setShowPassword(false)
@@ -233,7 +236,7 @@ export default function UsersPage() {
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell className="text-muted-foreground">{user.email}</TableCell>
                   <TableCell className="text-muted-foreground">{user.username}</TableCell>
-                  <TableCell className="text-muted-foreground">{user.phone}</TableCell>
+                  <TableCell className="text-muted-foreground">{displayPhone(user.phone)}</TableCell>
                   <TableCell>{roleBadge(user.role)}</TableCell>
                   <TableCell className="text-center">{user._count.projects}</TableCell>
                   <TableCell className="text-center text-muted-foreground text-sm">
@@ -313,7 +316,7 @@ export default function UsersPage() {
                   </span>
                   <span className="flex items-center gap-1">
                     <Phone className="h-3.5 w-3.5" />
-                    {user.phone || '-'}
+                    {displayPhone(user.phone)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">

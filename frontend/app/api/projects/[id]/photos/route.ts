@@ -201,6 +201,19 @@ export async function DELETE(
     // Thông báo cho Python backend để dừng xử lý AI nếu đang chạy
     if (cancelledUrls.length > 0) {
       try {
+        const vectorCleanupResponse = await fetch(buildBackendUrl(`/projects/${projectId}/vectors/images`), {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urls: cancelledUrls }),
+        })
+        if (!vectorCleanupResponse.ok) {
+          console.error(`AI vector cleanup returned ${vectorCleanupResponse.status} for project ${projectId}`)
+        }
+      } catch (error) {
+        console.error('AI vector cleanup error:', error)
+      }
+
+      try {
         fetch(buildBackendUrl('/cancel'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

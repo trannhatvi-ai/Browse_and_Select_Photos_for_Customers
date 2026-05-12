@@ -30,6 +30,13 @@ export interface AdminIntegrationConfig {
     oauthClientId: string
     oauthClientSecret: string
   }
+  facebook: {
+    enabled: boolean
+    pageAccessToken: string
+    recipientId: string
+    oauthClientId: string
+    oauthClientSecret: string
+  }
   telegram: {
     enabled: boolean
     botToken: string
@@ -56,6 +63,7 @@ export interface NotificationResult {
   target?: string
   status: 'sent' | 'skipped' | 'error'
   error?: string
+  providerMessageId?: string | null
 }
 
 export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
@@ -81,6 +89,13 @@ export const DEFAULT_ADMIN_INTEGRATION_CONFIG: AdminIntegrationConfig = {
   google: {
     enabled: false,
     apiKey: '',
+    oauthClientId: '',
+    oauthClientSecret: '',
+  },
+  facebook: {
+    enabled: false,
+    pageAccessToken: '',
+    recipientId: '',
     oauthClientId: '',
     oauthClientSecret: '',
   },
@@ -129,6 +144,13 @@ export function normalizeAdminIntegrationConfig(value: unknown): AdminIntegratio
       apiKey: raw.google?.apiKey || '',
       oauthClientId: raw.google?.oauthClientId || '',
       oauthClientSecret: raw.google?.oauthClientSecret || '',
+    },
+    facebook: {
+      enabled: raw.facebook?.enabled ?? false,
+      pageAccessToken: raw.facebook?.pageAccessToken || '',
+      recipientId: raw.facebook?.recipientId || '',
+      oauthClientId: raw.facebook?.oauthClientId || '',
+      oauthClientSecret: raw.facebook?.oauthClientSecret || '',
     },
     telegram: {
       enabled: raw.telegram?.enabled ?? false,
@@ -299,12 +321,12 @@ async function sendToChannel(
       const to = payload.toEmail || config.email.address
       if (!to) throw new Error('Chưa có email nhận thông báo.')
 
-      await queueEmail({
+      const providerMessageId = await queueEmail({
         to,
         subject: payload.subject,
         html: payload.html || buildScheduleReminderHtml(payload.message),
       })
-      return { channel, target: to, status: 'sent' }
+      return { channel, target: to, status: 'sent', providerMessageId }
     }
 
     if (channel === 'telegram') {

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { isMissingCloudinaryAccountTableError } from '@/lib/cloudinary-accounts'
+import { getPhoneLookupCandidates, normalizeEmail, normalizePhone } from '@/lib/auth-verification'
 import bcrypt from 'bcryptjs'
 
 // PATCH /api/users/[id] - Cap nhat user (ADMIN only)
@@ -19,12 +20,21 @@ export async function PATCH(
   const { id } = await params
   const body = await req.json()
   const { name, email, username, phone, password, role } = body
+  const normalizedEmail = email ? normalizeEmail(email) : ''
+  const normalizedPhone = phone ? normalizePhone(phone) : ''
+  const normalizedUsername = username ? String(username).trim() : ''
 
   const data: any = {}
   if (name) data.name = name
-  if (email) data.email = email
-  if (username) data.username = username
-  if (phone) data.phone = phone
+  if (email) data.email = normalizedEmail
+  if (username) data.username = normalizedUsername
+  if (phone) {
+    if (!normalizedPhone) {
+      return NextResponse.json({ error: 'Số điện thoại không hợp lệ' }, { status: 400 })
+    }
+    data.phone = normalizedPhone
+    data.phoneVerifiedAt = null
+  }
   if (role) data.role = role
   if (password) data.password = await bcrypt.hash(password, 10)
 
@@ -33,9 +43,9 @@ export async function PATCH(
       where: {
         id: { not: id },
         OR: [
-          email ? { email } : undefined,
-          username ? { username } : undefined,
-          phone ? { phone } : undefined,
+          email ? { email: normalizedEmail } : undefined,
+          username ? { username: normalizedUsername } : undefined,
+          phone ? { phone: { in: getPhoneLookupCandidates(normalizedPhone) } } : undefined,
         ].filter(Boolean) as any,
       },
     })

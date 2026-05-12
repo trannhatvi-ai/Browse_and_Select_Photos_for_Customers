@@ -5,6 +5,7 @@ import {
   PASSWORD_RESET_CODE_TTL_MS,
   generateOtpCode,
   getDevCodePayload,
+  getPhoneLookupCandidates,
   hashOtpCode,
   normalizeEmail,
   normalizePhone,
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
       ? normalizePhone(identifier)
       : normalizeEmail(identifier)
     const where = method === 'phone'
-      ? { phone: normalizedIdentifier }
+      ? { phone: { in: getPhoneLookupCandidates(normalizedIdentifier) } }
       : { email: normalizedIdentifier }
 
     const user = await prisma.user.findFirst({ where })

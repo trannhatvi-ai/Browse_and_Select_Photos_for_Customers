@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { formatVietnamPhoneForDisplay } from '@/lib/phone-format'
 
 class SyncAIError extends Error {
   status?: number
@@ -65,17 +66,28 @@ function formatBytes(bytes: number) {
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [savingCloudinary, setSavingCloudinary] = useState(false)
+  const [savingAdminConfig, setSavingAdminConfig] = useState(false)
   const [testingCloudinary, setTestingCloudinary] = useState(false)
   const [syncingFull, setSyncingFull] = useState(false)
   const [syncingIncremental, setSyncingIncremental] = useState(false)
   const searchParams = useSearchParams()
   const [cloudinaryGuideOpen, setCloudinaryGuideOpen] = useState(false)
   const [cloudinaryRequirementOpen, setCloudinaryRequirementOpen] = useState(false)
+  const [verificationDialogOpen, setVerificationDialogOpen] = useState(false)
+  const [verificationEmailCode, setVerificationEmailCode] = useState('')
+  const [verificationPhoneCode, setVerificationPhoneCode] = useState('')
+  const [verifyingContact, setVerifyingContact] = useState(false)
+  const [resendingVerification, setResendingVerification] = useState(false)
   const [zoomedImage, setZoomedImage] = useState<string | null>(null)
+  const [profileName, setProfileName] = useState('')
+  const [profileUsername, setProfileUsername] = useState('')
   const [studioName, setStudioName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [emailVerified, setEmailVerified] = useState(false)
+  const [phoneVerified, setPhoneVerified] = useState(false)
   const [cloudinaryCloudName, setCloudinaryCloudName] = useState('')
   const [cloudinaryApiKey, setCloudinaryApiKey] = useState('')
   const [cloudinaryApiSecret, setCloudinaryApiSecret] = useState('')
@@ -98,6 +110,11 @@ export default function SettingsPage() {
   const [googleApiKey, setGoogleApiKey] = useState('')
   const [googleOauthClientId, setGoogleOauthClientId] = useState('')
   const [googleOauthClientSecret, setGoogleOauthClientSecret] = useState('')
+  const [facebookEnabled, setFacebookEnabled] = useState(false)
+  const [facebookPageAccessToken, setFacebookPageAccessToken] = useState('')
+  const [facebookRecipientId, setFacebookRecipientId] = useState('')
+  const [facebookOauthClientId, setFacebookOauthClientId] = useState('')
+  const [facebookOauthClientSecret, setFacebookOauthClientSecret] = useState('')
   const [resendEnabled, setResendEnabled] = useState(false)
   const [resendApiKey, setResendApiKey] = useState('')
   const [resendFromEmail, setResendFromEmail] = useState('')
@@ -164,9 +181,13 @@ export default function SettingsPage() {
     fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
+        setProfileName(data.profileName || '')
+        setProfileUsername(data.profileUsername || '')
         setStudioName(data.studioName)
         setEmail(data.email || '')
-        setPhone(data.phone || '')
+        setPhone(formatVietnamPhoneForDisplay(data.phone))
+        setEmailVerified(Boolean(data.emailVerified))
+        setPhoneVerified(Boolean(data.phoneVerified))
         setCloudinaryCloudName(data.cloudinaryCloudName || '')
         setCloudinaryApiKey(data.cloudinaryApiKey || '')
         setCloudinaryApiSecret(data.cloudinaryApiSecret || '')
@@ -181,6 +202,11 @@ export default function SettingsPage() {
         setGoogleApiKey(adminIntegration.google?.apiKey || '')
         setGoogleOauthClientId(adminIntegration.google?.oauthClientId || '')
         setGoogleOauthClientSecret(adminIntegration.google?.oauthClientSecret || '')
+        setFacebookEnabled(adminIntegration.facebook?.enabled ?? false)
+        setFacebookPageAccessToken(adminIntegration.facebook?.pageAccessToken || '')
+        setFacebookRecipientId(adminIntegration.facebook?.recipientId || '')
+        setFacebookOauthClientId(adminIntegration.facebook?.oauthClientId || '')
+        setFacebookOauthClientSecret(adminIntegration.facebook?.oauthClientSecret || '')
         setResendEnabled(adminIntegration.resend?.enabled ?? false)
         setResendApiKey(adminIntegration.resend?.apiKey || '')
         setResendFromEmail(adminIntegration.resend?.fromEmail || '')
@@ -197,19 +223,137 @@ export default function SettingsPage() {
     [cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret].every(value => value.trim().length > 0)
   const isUsingSharedCloudinary = userRole !== 'ADMIN' && adminSharedCloudinaryAvailable && !hasCompleteStudioCloudinary
   const googleRedirectUri = `${appOrigin || 'http://localhost:3000'}/api/auth/callback/google`
+  const facebookRedirectUri = `${appOrigin || 'http://localhost:3000'}/api/auth/callback/facebook`
 
-  const handleSave = async () => {
-    setSaving(true)
+  const openVerification = () => {
+    setVerificationEmailCode('')
+    setVerificationPhoneCode('')
+    setVerificationDialogOpen(true)
+  }
+
+  const handleResendVerification = async () => {
+    setResendingVerification(true)
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, phone }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Không thể gửi lại mã xác thực')
+
+      if (data.devCodes?.email) setVerificationEmailCode(data.devCodes.email)
+      if (data.devCodes?.phone) setVerificationPhoneCode(data.devCodes.phone)
+      if (data.deliveryErrors?.length) {
+        toast.warning('Một số kênh chưa gửi được mã. Vui lòng kiểm tra cấu hình email/SMS rồi thử gửi lại.')
+      }
+      toast.success('Đã gửi lại mã xác thực.')
+    } catch (error) {
+      toast.error((error as Error).message)
+    } finally {
+      setResendingVerification(false)
+    }
+  }
+
+  const handleVerifyContact = async () => {
+    setVerifyingContact(true)
+    try {
+      const res = await fetch('/api/auth/verify-contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          phone,
+          emailCode: verificationEmailCode,
+          phoneCode: verificationPhoneCode,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Không thể xác thực tài khoản')
+
+      toast.success('Tài khoản đã được xác thực.')
+      setVerificationDialogOpen(false)
+      setEmailVerified(true)
+      setPhoneVerified(true)
+      void fetch('/api/settings')
+        .then(res => res.json())
+        .then(data => {
+          setProfileName(data.profileName || '')
+          setProfileUsername(data.profileUsername || '')
+          setStudioName(data.studioName)
+          setEmail(data.email || '')
+          setPhone(formatVietnamPhoneForDisplay(data.phone))
+          setEmailVerified(Boolean(data.emailVerified))
+          setPhoneVerified(Boolean(data.phoneVerified))
+        })
+    } catch (error) {
+      toast.error((error as Error).message)
+    } finally {
+      setVerifyingContact(false)
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true)
     const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        name: profileName,
+        username: profileUsername,
         studioName,
-        phone,
         email,
+        phone,
+      })
+    })
+
+    if (res.ok) {
+      toast.success('Đã lưu hồ sơ studio!')
+      void fetch('/api/settings')
+        .then(res => res.json())
+        .then(data => {
+          setProfileName(data.profileName || '')
+          setProfileUsername(data.profileUsername || '')
+          setStudioName(data.studioName)
+          setEmail(data.email || '')
+          setPhone(formatVietnamPhoneForDisplay(data.phone))
+          setEmailVerified(Boolean(data.emailVerified))
+          setPhoneVerified(Boolean(data.phoneVerified))
+        })
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error || 'Lỗi khi lưu hồ sơ!')
+    }
+    setSavingProfile(false)
+  }
+
+  const handleSaveCloudinary = async () => {
+    setSavingCloudinary(true)
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         cloudinaryCloudName,
         cloudinaryApiKey,
         cloudinaryApiSecret,
+      })
+    })
+
+    if (res.ok) {
+      toast.success('Đã lưu Cloudinary!')
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error || 'Lỗi khi lưu Cloudinary!')
+    }
+    setSavingCloudinary(false)
+  }
+
+  const handleSaveAdminConfig = async () => {
+    setSavingAdminConfig(true)
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         allowSharedCloudinary,
         vlmProvider,
         vlmApiKey,
@@ -221,6 +365,13 @@ export default function SettingsPage() {
             apiKey: googleApiKey,
             oauthClientId: googleOauthClientId,
             oauthClientSecret: googleOauthClientSecret,
+          },
+          facebook: {
+            enabled: facebookEnabled,
+            pageAccessToken: facebookPageAccessToken,
+            recipientId: facebookRecipientId,
+            oauthClientId: facebookOauthClientId,
+            oauthClientSecret: facebookOauthClientSecret,
           },
           resend: {
             enabled: resendEnabled,
@@ -237,11 +388,12 @@ export default function SettingsPage() {
     })
 
     if (res.ok) {
-      toast.success('Đã lưu cài đặt thành công!')
+      toast.success('Đã lưu cấu hình admin!')
     } else {
-      toast.error('Lỗi khi lưu cài đặt!')
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error || 'Lỗi khi lưu cấu hình admin!')
     }
-    setSaving(false)
+    setSavingAdminConfig(false)
   }
   
   const handleFlushVectors = async () => {
@@ -488,6 +640,49 @@ export default function SettingsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
                         <p className="flex items-center gap-2 text-sm font-semibold">
+                          <KeyRound className="h-4 w-4 text-blue-700" />
+                          Cấu hình Facebook OAuth để đăng nhập
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Dùng App ID và App Secret của Meta for Developers để bật nút đăng nhập Facebook.
+                        </p>
+                      </div>
+                      <Switch checked={facebookEnabled} onCheckedChange={setFacebookEnabled} />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="admin-facebook-client-id">Facebook App ID</Label>
+                        <Input
+                          id="admin-facebook-client-id"
+                          value={facebookOauthClientId}
+                          onChange={(event) => setFacebookOauthClientId(event.target.value)}
+                          placeholder="123456789012345"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="admin-facebook-client-secret">Facebook App Secret</Label>
+                        <Input
+                          id="admin-facebook-client-secret"
+                          type={showAdminIntegrationSecrets ? 'text' : 'password'}
+                          value={facebookOauthClientSecret}
+                          onChange={(event) => setFacebookOauthClientSecret(event.target.value)}
+                          placeholder="Meta app secret"
+                        />
+                      </div>
+                      <div className="grid gap-2 sm:col-span-2">
+                        <Label htmlFor="admin-facebook-redirect-uri">Valid OAuth Redirect URI cần thêm trong Facebook</Label>
+                        <Input id="admin-facebook-redirect-uri" value={facebookRedirectUri} readOnly />
+                      </div>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Facebook cần quyền email. Tài khoản social vẫn phải hoàn tất mật khẩu, số điện thoại và hồ sơ studio.
+                    </p>
+                  </section>
+
+                  <section className="space-y-4 rounded-lg border bg-background p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="flex items-center gap-2 text-sm font-semibold">
                           <Mail className="h-4 w-4 text-purple-600" />
                           Cấu hình Resend để gửi mail cho studio
                         </p>
@@ -605,6 +800,12 @@ export default function SettingsPage() {
                   <p className="text-[10px] text-muted-foreground italic">
                     * Nếu bạn dùng GitHub Models, hãy lấy Token tại GitHub Settings và chọn model gpt-4o-mini.
                   </p>
+                  <div className="flex justify-end pt-2">
+                    <Button onClick={handleSaveAdminConfig} disabled={savingAdminConfig} className="gap-2">
+                      {savingAdminConfig ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Lưu cấu hình admin
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -797,25 +998,130 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Thông tin Studio</CardTitle>
-            <CardDescription>Thông tin này sẽ hiển thị trên Gallery của khách hàng</CardDescription>
+            <CardDescription>Thông tin tài khoản và liên hệ sẽ hiển thị trên hệ thống và Gallery của khách hàng</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="profile-name">Tên hiển thị</Label>
+                <Input id="profile-name" value={profileName} onChange={(e) => setProfileName(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="profile-username">Username</Label>
+                <Input id="profile-username" value={profileUsername} onChange={(e) => setProfileUsername(e.target.value)} />
+              </div>
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="name">Tên Studio</Label>
               <Input id="name" value={studioName} onChange={(e) => setStudioName(e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="phone">Số điện thoại</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="phone">Số điện thoại</Label>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${phoneVerified ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {phoneVerified ? 'Đã xác thực' : 'Chưa xác thực'}
+                    </span>
+                    {!phoneVerified && (
+                      <Button type="button" variant="outline" size="sm" onClick={openVerification}>
+                        Xác thực
+                      </Button>
+                    )}
+                  </div>
+                </div>
                 <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="email">Email liên hệ</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="email">Email liên hệ</Label>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${emailVerified ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {emailVerified ? 'Đã xác thực' : 'Chưa xác thực'}
+                    </span>
+                    {!emailVerified && (
+                      <Button type="button" variant="outline" size="sm" onClick={openVerification}>
+                        Xác thực
+                      </Button>
+                    )}
+                  </div>
+                </div>
                 <Input id="email" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
             </div>
+            <div className="flex justify-end pt-2">
+              <Button onClick={handleSaveProfile} disabled={savingProfile} className="gap-2">
+                {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Lưu hồ sơ
+              </Button>
+            </div>
           </CardContent>
         </Card>
+
+        <Dialog open={verificationDialogOpen} onOpenChange={setVerificationDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader className="space-y-2 text-left">
+              <DialogTitle>Xác thực email và số điện thoại</DialogTitle>
+              <DialogDescription>
+                Nhập mã đã gửi tới email hoặc số điện thoại của studio. Bạn có thể bấm gửi lại mã ngay tại đây.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="verify-settings-email">Email</Label>
+                <Input id="verify-settings-email" value={email} readOnly />
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={emailVerified ? 'text-emerald-600' : 'text-amber-600'}>
+                    {emailVerified ? 'Đã xác thực' : 'Chưa xác thực'}
+                  </span>
+                  {!emailVerified && (
+                    <span className="text-muted-foreground">Nhập mã email nếu đang chờ xác thực</span>
+                  )}
+                </div>
+                {!emailVerified && (
+                  <Input
+                    value={verificationEmailCode}
+                    onChange={(e) => setVerificationEmailCode(e.target.value)}
+                    placeholder="Mã xác thực email"
+                    inputMode="numeric"
+                    maxLength={6}
+                  />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="verify-settings-phone">Số điện thoại</Label>
+                <Input id="verify-settings-phone" value={phone} readOnly />
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={phoneVerified ? 'text-emerald-600' : 'text-amber-600'}>
+                    {phoneVerified ? 'Đã xác thực' : 'Chưa xác thực'}
+                  </span>
+                  {!phoneVerified && (
+                    <span className="text-muted-foreground">Nhập mã SMS nếu đang chờ xác thực</span>
+                  )}
+                </div>
+                {!phoneVerified && (
+                  <Input
+                    value={verificationPhoneCode}
+                    onChange={(e) => setVerificationPhoneCode(e.target.value)}
+                    placeholder="Mã xác thực số điện thoại"
+                    inputMode="numeric"
+                    maxLength={6}
+                  />
+                )}
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={handleResendVerification} disabled={resendingVerification}>
+                {resendingVerification ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Gửi lại mã
+              </Button>
+              <Button type="button" onClick={handleVerifyContact} disabled={verifyingContact}>
+                {verifyingContact ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Xác thực
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Card>
           <CardHeader className="space-y-4">
@@ -925,15 +1231,15 @@ export default function SettingsPage() {
               {savingCloudinaryAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
               {savingCloudinaryAccount ? 'Đang thêm...' : 'Thêm vào Cloudinary pool'}
             </Button>
+            <div className="flex justify-end pt-2">
+              <Button onClick={handleSaveCloudinary} disabled={savingCloudinary} className="gap-2">
+                {savingCloudinary ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Lưu Cloudinary
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saving} className="gap-2">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Lưu thay đổi
-          </Button>
-        </div>
       </div>
 
       <Dialog open={cloudinaryRequirementOpen} onOpenChange={setCloudinaryRequirementOpen}>

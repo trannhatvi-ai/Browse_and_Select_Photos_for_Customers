@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db'
-import { isExpired, normalizePhone, verifyOtpCode } from '@/lib/auth-verification'
+import { getPhoneLookupCandidates, isExpired, normalizePhone, verifyOtpCode } from '@/lib/auth-verification'
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       const normalizedPhone = normalizePhone(phone)
       const user = await prisma.user.findFirst({
         where: {
-          phone: normalizedPhone,
+          phone: { in: getPhoneLookupCandidates(normalizedPhone) },
           phoneVerifiedAt: { not: null },
         },
       })
