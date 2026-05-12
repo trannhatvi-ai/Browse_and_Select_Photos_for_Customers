@@ -7,7 +7,7 @@ jest.mock('next-auth/react', () => ({
 
 describe('refreshCompleteProfileSession', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    jest.resetAllMocks()
   })
 
   it('re-signs in with credentials so the JWT contains the completed profile', async () => {
@@ -32,5 +32,17 @@ describe('refreshCompleteProfileSession', () => {
       username: 'owner_studio',
       password: 'secret123',
     })).rejects.toThrow('Unable to refresh completed profile session')
+  })
+
+  it('refreshes the existing session when no password was provided', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true })
+    global.fetch = fetchMock
+
+    await refreshCompleteProfileSession({
+      username: 'owner_studio',
+    })
+
+    expect(signIn).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/session', { cache: 'no-store' })
   })
 })

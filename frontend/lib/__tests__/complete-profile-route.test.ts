@@ -61,6 +61,7 @@ describe('/api/auth/complete-profile', () => {
       emailVerifiedAt: new Date('2026-05-12T00:00:00.000Z'),
       username: 'owner',
       name: 'Owner',
+      password: null,
       phone: null,
       phoneVerifiedAt: null,
       settings: { studioName: 'Owner Studio' },
@@ -75,6 +76,7 @@ describe('/api/auth/complete-profile', () => {
       emailVerified: true,
       username: 'owner',
       name: 'Owner',
+      hasPassword: false,
       phone: null,
       phoneVerified: false,
       studioName: 'Owner Studio',
@@ -87,6 +89,7 @@ describe('/api/auth/complete-profile', () => {
       email: 'owner@example.com',
       emailVerifiedAt: new Date(),
       username: 'owner',
+      password: null,
       phone: null,
       phoneVerifiedAt: null,
     })
@@ -123,12 +126,43 @@ describe('/api/auth/complete-profile', () => {
     expect(body).toEqual({ success: true, requiresPhoneVerification: true, devCode: '123456' })
   })
 
+  it('updates profile without asking for a new password when the user already has one', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'owner@example.com',
+      emailVerifiedAt: new Date(),
+      username: 'owner',
+      password: 'existing-hash',
+      phone: '+84901234567',
+      phoneVerifiedAt: null,
+    })
+    mockPrisma.user.findFirst.mockResolvedValue(null)
+    mockPrisma.user.update.mockResolvedValue({})
+    mockPrisma.settings.upsert.mockResolvedValue({})
+
+    const response = await POST(jsonRequest({
+      username: 'owner_studio',
+      name: 'Owner Name',
+      studioName: 'Owner Studio',
+      phone: '090 123 4567',
+    }))
+
+    expect(response.status).toBe(200)
+    expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: expect.not.objectContaining({
+        password: expect.anything(),
+      }),
+    })
+  })
+
   it('keeps profile update successful when phone OTP delivery fails', async () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       email: 'owner@example.com',
       emailVerifiedAt: new Date(),
       username: 'owner',
+      password: null,
       phone: null,
       phoneVerifiedAt: null,
     })

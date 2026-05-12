@@ -42,6 +42,7 @@ export async function GET() {
         emailVerifiedAt: true,
         username: true,
         name: true,
+        password: true,
         phone: true,
         phoneVerifiedAt: true,
         settings: { select: { studioName: true } },
@@ -57,6 +58,7 @@ export async function GET() {
       emailVerified: Boolean(user.emailVerifiedAt),
       username: user.username || emailPrefix(user.email),
       name: fallbackName,
+      hasPassword: Boolean(user.password),
       phone: user.phone,
       phoneVerified: Boolean(user.phoneVerifiedAt),
       studioName: user.settings?.studioName || `${fallbackName} Studio`,
@@ -81,11 +83,11 @@ export async function POST(req: Request) {
     const password = trimString(body.password)
     const normalizedPhone = normalizePhone(body.phone)
 
-    if (!username || !name || !studioName || !password || !normalizedPhone) {
+    if (!username || !name || !studioName || !normalizedPhone) {
       return NextResponse.json({ error: 'Vui lòng nhập đầy đủ thông tin' }, { status: 400 })
     }
 
-    if (password.length < 6) {
+    if (password && password.length < 6) {
       return NextResponse.json({ error: 'Mật khẩu phải có ít nhất 6 ký tự' }, { status: 400 })
     }
 
@@ -96,12 +98,17 @@ export async function POST(req: Request) {
         email: true,
         emailVerifiedAt: true,
         username: true,
+        password: true,
         phone: true,
         phoneVerifiedAt: true,
       },
     })
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!user.password && !password) {
+      return NextResponse.json({ error: 'Vui lòng nhập đầy đủ thông tin' }, { status: 400 })
     }
 
     const usernameOwner = await prisma.user.findFirst({
@@ -137,17 +144,21 @@ export async function POST(req: Request) {
     const phoneAlreadyVerified = user.phone === normalizedPhone && Boolean(user.phoneVerifiedAt)
     const code = phoneAlreadyVerified ? null : generateOtpCode()
 
+    const userUpdateData: Record<string, unknown> = {
+      username,
+      name,
+      phone: normalizedPhone,
+      phoneVerifiedAt: phoneAlreadyVerified ? user.phoneVerifiedAt : null,
+      phoneVerificationCodeHash: code ? hashOtpCode(code) : null,
+      phoneVerificationExpires: code ? new Date(Date.now() + CONTACT_VERIFICATION_TTL_MS) : null,
+    }
+    if (password) {
+      userUpdateData.password = await bcrypt.hash(password, 12)
+    }
+
     await prisma.user.update({
       where: { id: userId },
-      data: {
-        username,
-        name,
-        password: await bcrypt.hash(password, 12),
-        phone: normalizedPhone,
-        phoneVerifiedAt: phoneAlreadyVerified ? user.phoneVerifiedAt : null,
-        phoneVerificationCodeHash: code ? hashOtpCode(code) : null,
-        phoneVerificationExpires: code ? new Date(Date.now() + CONTACT_VERIFICATION_TTL_MS) : null,
-      },
+      data: userUpdateData,
     })
 
     await prisma.settings.upsert({

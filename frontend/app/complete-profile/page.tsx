@@ -2,7 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, LogOut, ShieldCheck, UserRound } from 'lucide-react'
+import { Eye, EyeOff, Loader2, LogOut, ShieldCheck, UserRound } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 import { formatVietnamPhoneForDisplay } from '@/lib/phone-format'
 import { normalizeCallbackUrl } from '@/lib/callback-url'
@@ -13,6 +13,7 @@ type ProfileDefaults = {
   emailVerified: boolean
   username: string
   name: string
+  hasPassword: boolean
   phone: string | null
   phoneVerified: boolean
   studioName: string
@@ -28,6 +29,8 @@ function CompleteProfileContent() {
   const [studioName, setStudioName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -65,8 +68,9 @@ function CompleteProfileContent() {
   async function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+    const needsPassword = defaults?.hasPassword === false
 
-    if (password !== confirmPassword) {
+    if (needsPassword && password !== confirmPassword) {
       setError('Mật khẩu nhập lại không khớp')
       return
     }
@@ -76,14 +80,14 @@ function CompleteProfileContent() {
       const response = await fetch('/api/auth/complete-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, name, studioName, password, phone }),
+        body: JSON.stringify({ username, name, studioName, password: needsPassword ? password : undefined, phone }),
       })
       const body = await response.json()
       if (!response.ok) {
         setError(body.error || 'Không thể cập nhật hồ sơ')
         return
       }
-      await refreshCompleteProfileSession({ username, password })
+      await refreshCompleteProfileSession({ username, password: needsPassword ? password : undefined })
       router.replace(callbackUrl)
       router.refresh()
     } catch {
@@ -140,14 +144,28 @@ function CompleteProfileContent() {
               Tên studio
               <input id="studio-name" value={studioName} onChange={(event) => setStudioName(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 outline-none" />
             </label>
+            {defaults?.hasPassword === false && (
+              <>
             <label className="block text-sm font-medium text-zinc-200" htmlFor="password">
               Mật khẩu
-              <input id="password" value={password} onChange={(event) => setPassword(event.target.value)} type="password" className="mt-2 h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 outline-none" />
+              <span className="relative mt-2 block">
+                <input id="password" value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? 'text' : 'password'} minLength={6} required className="h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 pr-10 outline-none" />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-3 text-zinc-400 transition hover:text-white" aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
+                  {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                </button>
+              </span>
             </label>
             <label className="block text-sm font-medium text-zinc-200" htmlFor="confirm-password">
               Nhập lại mật khẩu
-              <input id="confirm-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" className="mt-2 h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 outline-none" />
+              <span className="relative mt-2 block">
+                <input id="confirm-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type={showConfirmPassword ? 'text' : 'password'} minLength={6} required className="h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 pr-10 outline-none" />
+                <button type="button" onClick={() => setShowConfirmPassword((value) => !value)} className="absolute right-3 top-3 text-zinc-400 transition hover:text-white" aria-label={showConfirmPassword ? 'Ẩn mật khẩu nhập lại' : 'Hiện mật khẩu nhập lại'}>
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                </button>
+              </span>
             </label>
+              </>
+            )}
             <label className="block text-sm font-medium text-zinc-200 sm:col-span-2" htmlFor="phone">
               Số điện thoại
               <input id="phone" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="090 123 4567" className="mt-2 h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 outline-none placeholder:text-zinc-500" autoComplete="tel" />
