@@ -220,8 +220,8 @@ export function ClientGallery({ token }: { token?: string }) {
         throw new Error(message)
       }
       console.log('[semantic search] qdrant response', data)
-      const getFileId = (url: string) => url ? url.split('/').pop()?.split('.')[0] || '' : ''
-      const returnedScoreMap = new Map(data.results?.map((r: any) => [getFileId(r.image_url || r.metadata?.original_url), r.score]) || [])
+      const getFileId = (url?: string | null) => url ? url.split('/').pop()?.split('.')[0] || '' : ''
+      const returnedScoreMap = new Map<string, number>(data.results?.map((r: any) => [getFileId(r.image_url || r.metadata?.original_url), Number(r.score ?? 0)]) || [])
       const matchedIds = photos.filter(p => returnedScoreMap.has(getFileId(p.originalUrl)) || returnedScoreMap.has(getFileId(p.src))).map(p => p.id)
       const matches = new Set<string>(matchedIds)
       
@@ -263,8 +263,8 @@ export function ClientGallery({ token }: { token?: string }) {
       const res = await fetch('/api/search/face', { method: 'POST', body: formData })
       if (!res.ok) throw new Error()
       const data = await res.json()
-      const getFileId = (url: string) => url ? url.split('/').pop()?.split('.')[0] || '' : ''
-      const returnedScoreMap = new Map(data.results?.map((r: any) => [getFileId(r.image_url || r.metadata?.original_url), r.score || 1]) || [])
+      const getFileId = (url?: string | null) => url ? url.split('/').pop()?.split('.')[0] || '' : ''
+      const returnedScoreMap = new Map<string, number>(data.results?.map((r: any) => [getFileId(r.image_url || r.metadata?.original_url), Number(r.score ?? 1)]) || [])
       const matchedIds = photos.filter(p => returnedScoreMap.has(getFileId(p.originalUrl)) || returnedScoreMap.has(getFileId(p.src))).map(p => p.id)
       const matches = new Set<string>(matchedIds)
       

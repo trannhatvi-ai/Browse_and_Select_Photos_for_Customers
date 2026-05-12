@@ -12,7 +12,7 @@ export async function POST(
 
   const project = await prisma.project.findFirst({
     where: { accessToken: token },
-    include: { createdBy: true }
+    include: { createdByUser: true }
   })
 
   if (!project) {
@@ -50,7 +50,7 @@ export async function POST(
   // Gửi thông báo tới studio qua tất cả kênh
   try {
     await sendStudioNotification({
-      userId: project.createdBy.id,
+      userId: project.createdByUser.id,
       subject: `Khách đã hoàn thành chọn ảnh: ${project.eventName}`,
       message: `Khách hàng ${project.clientName} đã hoàn thành chọn ảnh cho sự kiện "${project.eventName}".\n\nSố ảnh được chọn: ${selectedCount} ảnh\n\nVui lòng kiểm tra lại các ảnh đã chọn và xử lý tiếp theo.`,
       scheduleId: project.id,

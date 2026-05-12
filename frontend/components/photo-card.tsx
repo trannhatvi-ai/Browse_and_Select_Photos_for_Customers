@@ -18,7 +18,7 @@ interface PhotoCardProps {
   onIndexed?: () => void
 }
 
-export function PhotoCard({ photo, onSelect, onComment, onOpen, highlighted, aiGroupSize, projectId: propProjectId, onIndexed }: PhotoCardProps) {
+export function PhotoCard({ photo, onSelect, onComment, onOpen, highlighted, aiGroupSize, onShowGroup, projectId: propProjectId, onIndexed }: PhotoCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [indexing, setIndexing] = useState(false)

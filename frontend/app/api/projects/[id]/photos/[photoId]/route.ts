@@ -29,11 +29,5 @@ export async function DELETE(
   // Delete DB record
   await prisma.photo.delete({ where: { id: photoId } })
 
-  // Decrement project photo count
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { photoCount: { decrement: 1 } },
-  })
-
   return NextResponse.json({ success: true })
 }

@@ -22,6 +22,7 @@ export interface Project {
   clientEmail: string
   eventName: string
   eventDate: string
+  createdAt?: string
   status: 'CHOOSING' | 'DONE'
   deadline: string
   photoCount: number

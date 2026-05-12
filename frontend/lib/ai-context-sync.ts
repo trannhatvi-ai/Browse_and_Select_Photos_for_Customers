@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { buildBackendUrl } from '@/lib/backend-api'
+import type { Prisma } from '@prisma/client'
 
 type RemoteAsset = {
   image_url: string
@@ -105,7 +106,7 @@ export async function syncProjectPhotoAiContexts(
 
     return prisma.photo.update({
       where: { id: photo.id },
-      data: { aiContext: geminiContext },
+      data: { aiContext: geminiContext as Prisma.InputJsonValue },
     })
   })
 

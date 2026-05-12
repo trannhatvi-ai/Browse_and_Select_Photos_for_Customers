@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-CREATE TABLE "CloudinaryAccount" (
+CREATE TABLE IF NOT EXISTS "CloudinaryAccount" (
   "id" TEXT NOT NULL DEFAULT replace(gen_random_uuid()::text, '-', ''),
   "userId" TEXT NOT NULL,
   "label" TEXT NOT NULL,
@@ -16,22 +16,36 @@ CREATE TABLE "CloudinaryAccount" (
   CONSTRAINT "CloudinaryAccount_pkey" PRIMARY KEY ("id")
 );
 
-ALTER TABLE "CloudinaryAccount"
-  ADD CONSTRAINT "CloudinaryAccount_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'CloudinaryAccount_userId_fkey'
+  ) THEN
+    ALTER TABLE "CloudinaryAccount"
+      ADD CONSTRAINT "CloudinaryAccount_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
-CREATE INDEX "CloudinaryAccount_userId_idx" ON "CloudinaryAccount"("userId");
-CREATE UNIQUE INDEX "CloudinaryAccount_userId_cloudName_key" ON "CloudinaryAccount"("userId", "cloudName");
+CREATE INDEX IF NOT EXISTS "CloudinaryAccount_userId_idx" ON "CloudinaryAccount"("userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "CloudinaryAccount_userId_cloudName_key" ON "CloudinaryAccount"("userId", "cloudName");
 
 ALTER TABLE "Photo"
-  ADD COLUMN "cloudinaryAccountId" TEXT,
-  ADD COLUMN "cloudinaryCloudName" TEXT;
+  ADD COLUMN IF NOT EXISTS "cloudinaryAccountId" TEXT,
+  ADD COLUMN IF NOT EXISTS "cloudinaryCloudName" TEXT;
 
-ALTER TABLE "Photo"
-  ADD CONSTRAINT "Photo_cloudinaryAccountId_fkey"
-  FOREIGN KEY ("cloudinaryAccountId") REFERENCES "CloudinaryAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'Photo_cloudinaryAccountId_fkey'
+  ) THEN
+    ALTER TABLE "Photo"
+      ADD CONSTRAINT "Photo_cloudinaryAccountId_fkey"
+      FOREIGN KEY ("cloudinaryAccountId") REFERENCES "CloudinaryAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
 
-CREATE INDEX "Photo_cloudinaryAccountId_idx" ON "Photo"("cloudinaryAccountId");
+CREATE INDEX IF NOT EXISTS "Photo_cloudinaryAccountId_idx" ON "Photo"("cloudinaryAccountId");
 
 INSERT INTO "CloudinaryAccount" ("userId", "label", "cloudName", "apiKey", "apiSecret")
 SELECT "userId", "cloudinaryCloudName", "cloudinaryCloudName", "cloudinaryApiKey", "cloudinaryApiSecret"

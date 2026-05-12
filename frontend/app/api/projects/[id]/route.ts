@@ -109,7 +109,7 @@ export async function DELETE(
       previewUrl: true,
       cloudinaryAccountId: true,
       cloudinaryCloudName: true,
-    } as any
+    },
   })
 
   // 2. Xóa từng ảnh trên Cloudinary

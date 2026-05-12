@@ -193,6 +193,16 @@ function createProviders(
               ...(phoneCandidates.length ? [{ phone: { in: phoneCandidates } }] : []),
             ],
           },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            username: true,
+            phone: true,
+            phoneVerifiedAt: true,
+            password: true,
+            role: true,
+          },
         })
 
         if (!user || !user.password) {
@@ -293,7 +303,7 @@ export function buildAuthOptions(
             token.role = dbUser.role
             token.email = dbUser.email
             token.name = dbUser.name
-            token.phone = dbUser.phone
+            token.phone = dbUser.phone ?? undefined
             token.phoneVerifiedAt = dbUser.phoneVerifiedAt?.toISOString()
             token.profileComplete = isProfileComplete(dbUser)
           }
@@ -319,7 +329,7 @@ export function buildAuthOptions(
           })
           if (dbUser) {
             token.role = dbUser.role
-            token.phone = dbUser.phone
+            token.phone = dbUser.phone ?? undefined
             token.phoneVerifiedAt = dbUser.phoneVerifiedAt?.toISOString()
             token.profileComplete = isProfileComplete(dbUser)
           }
