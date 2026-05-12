@@ -156,13 +156,20 @@ export async function POST(req: Request) {
       create: { userId, studioName, phone: normalizedPhone, email: user.email },
     })
 
+    const deliveryErrors: string[] = []
     if (code) {
-      await sendPhoneVerificationSms(normalizedPhone, code)
+      try {
+        await sendPhoneVerificationSms(normalizedPhone, code)
+      } catch (error) {
+        console.error('Complete profile phone verification delivery error:', error)
+        deliveryErrors.push('phone')
+      }
     }
 
     return NextResponse.json({
       success: true,
       requiresPhoneVerification: Boolean(code),
+      deliveryErrors: deliveryErrors.length ? deliveryErrors : undefined,
       devCode: code ? getDevCodePayload(code) : undefined,
     })
   } catch (error) {

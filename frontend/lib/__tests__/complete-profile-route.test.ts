@@ -123,6 +123,46 @@ describe('/api/auth/complete-profile', () => {
     expect(body).toEqual({ success: true, requiresPhoneVerification: true, devCode: '123456' })
   })
 
+  it('keeps profile update successful when phone OTP delivery fails', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'owner@example.com',
+      emailVerifiedAt: new Date(),
+      username: 'owner',
+      phone: null,
+      phoneVerifiedAt: null,
+    })
+    mockPrisma.user.findFirst.mockResolvedValue(null)
+    mockPrisma.user.update.mockResolvedValue({})
+    mockPrisma.settings.upsert.mockResolvedValue({})
+    ;(sendPhoneVerificationSms as jest.Mock).mockRejectedValueOnce(new Error('SMS provider unavailable'))
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+
+    const response = await POST(jsonRequest({
+      username: 'owner_studio',
+      name: 'Owner Name',
+      studioName: 'Owner Studio',
+      password: 'secret123',
+      phone: '090 123 4567',
+    }))
+    const body = await response.json()
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Complete profile phone verification delivery error:',
+      expect.any(Error)
+    )
+    consoleErrorSpy.mockRestore()
+    expect(response.status).toBe(200)
+    expect(mockPrisma.user.update).toHaveBeenCalled()
+    expect(mockPrisma.settings.upsert).toHaveBeenCalled()
+    expect(body).toEqual({
+      success: true,
+      requiresPhoneVerification: true,
+      deliveryErrors: ['phone'],
+      devCode: '123456',
+    })
+  })
+
   it('verifies the pending phone code', async () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
