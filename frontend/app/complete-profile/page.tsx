@@ -6,6 +6,7 @@ import { Loader2, LogOut, ShieldCheck, UserRound } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 import { formatVietnamPhoneForDisplay } from '@/lib/phone-format'
 import { normalizeCallbackUrl } from '@/lib/callback-url'
+import { refreshCompleteProfileSession } from '@/lib/complete-profile-session'
 
 type ProfileDefaults = {
   email: string
@@ -82,7 +83,7 @@ function CompleteProfileContent() {
         setError(body.error || 'Không thể cập nhật hồ sơ')
         return
       }
-      await fetch('/api/auth/session', { cache: 'no-store' })
+      await refreshCompleteProfileSession({ username, password })
       router.replace(callbackUrl)
       router.refresh()
     } catch {

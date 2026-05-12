@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Lock, Mail, Eye, EyeOff, Sparkles, Phone } from 'lucide-react'
+import { ArrowRight, Lock, Mail, Eye, EyeOff, Sparkles, Phone, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -39,6 +39,7 @@ export default function LoginClient() {
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('')
   const [googleAvailable, setGoogleAvailable] = useState(false)
   const [facebookAvailable, setFacebookAvailable] = useState(false)
+  const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = normalizeCallbackUrl(searchParams.get('callbackUrl'))
@@ -84,11 +85,21 @@ export default function LoginClient() {
   }
 
   const handleGoogleLogin = () => {
-    void signIn('google', { callbackUrl })
+    if (socialLoading) return
+    setSocialLoading('google')
+    void signIn('google', { callbackUrl }).catch(() => {
+      setSocialLoading(null)
+      setError('Không thể đăng nhập bằng Google')
+    })
   }
 
   const handleFacebookLogin = () => {
-    void signIn('facebook', { callbackUrl })
+    if (socialLoading) return
+    setSocialLoading('facebook')
+    void signIn('facebook', { callbackUrl }).catch(() => {
+      setSocialLoading(null)
+      setError('Không thể đăng nhập bằng Facebook')
+    })
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -250,10 +261,12 @@ export default function LoginClient() {
                   variant="outline"
                   className="w-full gap-2"
                   onClick={handleGoogleLogin}
-                  disabled={!googleAvailable}
+                  disabled={!googleAvailable || Boolean(socialLoading)}
                   title={googleButtonTitle}
+                  aria-busy={socialLoading === 'google'}
                 >
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold">
+                  {socialLoading === 'google' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  <span className={cn('flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold', socialLoading === 'google' && 'hidden')}>
                     G
                   </span>
                   Đăng nhập bằng Google
@@ -263,10 +276,12 @@ export default function LoginClient() {
                   variant="outline"
                   className="w-full gap-2"
                   onClick={handleFacebookLogin}
-                  disabled={!facebookAvailable}
+                  disabled={!facebookAvailable || Boolean(socialLoading)}
                   title={facebookButtonTitle}
+                  aria-busy={socialLoading === 'facebook'}
                 >
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold">
+                  {socialLoading === 'facebook' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  <span className={cn('flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold', socialLoading === 'facebook' && 'hidden')}>
                     f
                   </span>
                   Đăng nhập bằng Facebook
@@ -346,10 +361,12 @@ export default function LoginClient() {
                   variant="outline"
                   className="w-full gap-2"
                   onClick={handleGoogleLogin}
-                  disabled={!googleAvailable}
+                  disabled={!googleAvailable || Boolean(socialLoading)}
                   title={googleButtonTitle}
+                  aria-busy={socialLoading === 'google'}
                 >
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold">
+                  {socialLoading === 'google' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  <span className={cn('flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold', socialLoading === 'google' && 'hidden')}>
                     G
                   </span>
                   Tạo tài khoản bằng Google
