@@ -4,11 +4,12 @@ import { FormEvent, Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, LogOut, Phone, ShieldCheck } from 'lucide-react'
 import { signOut } from 'next-auth/react'
+import { normalizeCallbackUrl } from '@/lib/callback-url'
 
 function CompletePhoneContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+  const callbackUrl = normalizeCallbackUrl(searchParams.get('callbackUrl'))
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)

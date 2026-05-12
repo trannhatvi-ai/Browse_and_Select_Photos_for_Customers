@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, LogOut, ShieldCheck, UserRound } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 import { formatVietnamPhoneForDisplay } from '@/lib/phone-format'
+import { normalizeCallbackUrl } from '@/lib/callback-url'
 
 type ProfileDefaults = {
   email: string
@@ -19,7 +20,7 @@ type ProfileDefaults = {
 function CompleteProfileContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+  const callbackUrl = normalizeCallbackUrl(searchParams.get('callbackUrl'))
   const [defaults, setDefaults] = useState<ProfileDefaults | null>(null)
   const [username, setUsername] = useState('')
   const [name, setName] = useState('')

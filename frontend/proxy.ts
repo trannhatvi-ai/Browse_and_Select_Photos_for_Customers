@@ -16,14 +16,14 @@ export async function proxy(req: NextRequest) {
   // If not authenticated, redirect to login
   if (!token) {
     const signInUrl = new URL('/login', req.url)
-    signInUrl.searchParams.set('callbackUrl', req.url)
+    signInUrl.searchParams.set('callbackUrl', `${req.nextUrl.pathname}${req.nextUrl.search}${req.nextUrl.hash}`)
     return NextResponse.redirect(signInUrl)
   }
 
   const hasCompleteProfile = token.role === 'ADMIN' || token.profileComplete === true
   if (!hasCompleteProfile) {
     const completeProfileUrl = new URL('/complete-profile', req.url)
-    completeProfileUrl.searchParams.set('callbackUrl', req.url)
+    completeProfileUrl.searchParams.set('callbackUrl', `${req.nextUrl.pathname}${req.nextUrl.search}${req.nextUrl.hash}`)
     return NextResponse.redirect(completeProfileUrl)
   }
 

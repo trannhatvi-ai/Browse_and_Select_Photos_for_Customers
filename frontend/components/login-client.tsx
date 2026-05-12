@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { normalizeCallbackUrl } from '@/lib/callback-url'
 
 export default function LoginClient() {
   const [activeTab, setActiveTab] = useState('login')
@@ -40,7 +41,7 @@ export default function LoginClient() {
   const [facebookAvailable, setFacebookAvailable] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+  const callbackUrl = normalizeCallbackUrl(searchParams.get('callbackUrl'))
 
   useEffect(() => {
     const tab = searchParams.get('tab')

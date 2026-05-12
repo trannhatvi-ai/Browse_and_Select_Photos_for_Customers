@@ -27,7 +27,7 @@ describe('Auth Proxy', () => {
 
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/login?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fdashboard'
+      'http://localhost:3000/login?callbackUrl=%2Fdashboard'
     )
   })
 
@@ -53,7 +53,7 @@ describe('Auth Proxy', () => {
 
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/complete-profile?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fdashboard%2Fprojects'
+      'http://localhost:3000/complete-profile?callbackUrl=%2Fdashboard%2Fprojects'
     )
   })
 
