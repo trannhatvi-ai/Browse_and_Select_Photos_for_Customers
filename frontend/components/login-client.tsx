@@ -269,7 +269,7 @@ export default function LoginClient() {
                   <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold">
                     f
                   </span>
-                  Dang nhap bang Facebook
+                  Đăng nhập bằng Facebook
                 </Button>
                 {!googleAvailable && (
                   <p className="text-xs text-muted-foreground">
