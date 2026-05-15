@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import {
   Bell,
   CalendarDays,
-  Camera,
   FolderOpen,
   LayoutDashboard,
   LogOut,
@@ -16,6 +15,7 @@ import {
 import { signOut } from 'next-auth/react'
 import { SharedCloudinaryLogoIndicator } from '@/components/cloudinary-usage-notice'
 import { useSidebar } from '@/components/sidebar-context'
+import { StudioLogo, StudioLogoMark } from '@/components/studio-logo'
 import { cn } from '@/lib/utils'
 
 const baseNavItems = [
@@ -50,14 +50,16 @@ export function DashboardSidebar({
       )}>
         {isSidebarOpen && (
           <div className="flex items-center gap-2 overflow-visible whitespace-nowrap transition-all duration-300">
-            <Camera className="h-6 w-6" />
-            <span className="text-lg font-semibold">Studio Pro</span>
+            <StudioLogo
+              markClassName="h-8 w-8 rounded-xl"
+              textClassName="text-sidebar-foreground"
+            />
             <SharedCloudinaryLogoIndicator />
           </div>
         )}
         {!isSidebarOpen && (
           <div className="flex items-center gap-1">
-            <Camera className="h-6 w-6" />
+            <StudioLogoMark className="h-8 w-8 rounded-xl" sizes="32px" />
             <SharedCloudinaryLogoIndicator popoverSide="right" />
           </div>
         )}

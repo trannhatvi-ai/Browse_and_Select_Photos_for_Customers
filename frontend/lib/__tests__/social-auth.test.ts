@@ -5,6 +5,7 @@ jest.mock('@/lib/db', () => ({
   prisma: {
     user: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       create: jest.fn(),
     },
@@ -29,6 +30,11 @@ const mockPrisma = prisma as any
 describe('social auth', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockPrisma.user.findUnique.mockReset()
+    mockPrisma.user.findFirst.mockReset()
+    mockPrisma.user.update.mockReset()
+    mockPrisma.user.create.mockReset()
+    mockPrisma.settings.findFirst.mockReset()
   })
 
   it('registers both Google and Facebook providers when configured', () => {
@@ -48,7 +54,7 @@ describe('social auth', () => {
     mockPrisma.user.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
+    mockPrisma.user.findFirst.mockResolvedValueOnce(null)
     mockPrisma.user.create.mockResolvedValue({
       id: 'user-1',
       email: 'owner@example.com',
@@ -101,6 +107,7 @@ describe('social auth', () => {
     mockPrisma.user.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(existing)
+    mockPrisma.user.findFirst.mockResolvedValueOnce(existing)
     mockPrisma.user.update.mockResolvedValue({ ...existing, facebookId: 'fb-1' })
 
     const options = buildAuthOptions()
@@ -118,5 +125,68 @@ describe('social auth', () => {
       }),
       include: { settings: true },
     })
+  })
+
+  it('keeps an existing admin account when Google email matches a provider-linked studio account', async () => {
+    const admin = {
+      id: 'admin-1',
+      email: 'ViTranNhat@gmail.com',
+      name: 'Vi Tran Nhat',
+      username: 'admin',
+      phone: '+84901234567',
+      phoneVerifiedAt: new Date('2026-05-12T00:00:00.000Z'),
+      role: 'ADMIN',
+      password: 'hash',
+      googleId: null,
+      facebookId: null,
+      emailVerifiedAt: new Date('2026-05-12T00:00:00.000Z'),
+      authProvider: 'credentials',
+      settings: { studioName: 'Admin Studio' },
+    }
+    const studioWithProvider = {
+      id: 'studio-1',
+      email: 'studio@example.com',
+      name: 'Studio',
+      username: 'studio',
+      phone: null,
+      phoneVerifiedAt: null,
+      role: 'STUDIO',
+      password: null,
+      googleId: 'google-1',
+      facebookId: null,
+      emailVerifiedAt: new Date('2026-05-12T00:00:00.000Z'),
+      authProvider: 'google',
+      settings: { studioName: 'Studio' },
+    }
+
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce(studioWithProvider)
+      .mockResolvedValueOnce({
+        role: 'ADMIN',
+        password: admin.password,
+        name: admin.name,
+        username: admin.username,
+        phone: admin.phone,
+        phoneVerifiedAt: admin.phoneVerifiedAt,
+        emailVerifiedAt: admin.emailVerifiedAt,
+        settings: admin.settings,
+      })
+    mockPrisma.user.findFirst.mockResolvedValueOnce(admin)
+    mockPrisma.user.update.mockImplementation(async ({ where }: any) => (
+      where.id === 'admin-1' ? admin : studioWithProvider
+    ))
+
+    const options = buildAuthOptions()
+    const token = await options.callbacks?.jwt?.({
+      token: {},
+      account: { provider: 'google', providerAccountId: 'google-1' } as any,
+      profile: { email: 'vitrannhat@gmail.com', name: 'Vi Tran Nhat' } as any,
+    } as any)
+
+    expect(token?.role).toBe('ADMIN')
+    const updateArgs = mockPrisma.user.update.mock.calls[0][0]
+    expect(updateArgs.where).toEqual({ id: 'admin-1' })
+    expect(updateArgs.data).not.toHaveProperty('role')
+    expect(updateArgs.data).not.toHaveProperty('googleId')
   })
 })

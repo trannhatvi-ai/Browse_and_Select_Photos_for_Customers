@@ -2,11 +2,12 @@
 
 import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Eye, EyeOff, Loader2, LogOut, ShieldCheck, UserRound } from 'lucide-react'
+import { Eye, EyeOff, Loader2, LogOut, ShieldCheck } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 import { formatVietnamPhoneForDisplay } from '@/lib/phone-format'
 import { normalizeCallbackUrl } from '@/lib/callback-url'
 import { refreshCompleteProfileSession } from '@/lib/complete-profile-session'
+import { StudioLogoMark } from '@/components/studio-logo'
 
 type ProfileDefaults = {
   email: string
@@ -101,9 +102,7 @@ function CompleteProfileContent() {
     <main className="min-h-screen bg-zinc-950 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center px-6 py-10">
         <div className="mb-8">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500 text-zinc-950">
-            <UserRound className="h-6 w-6" aria-hidden="true" />
-          </div>
+          <StudioLogoMark className="mb-4 h-12 w-12 rounded-xl ring-white/10" priority sizes="48px" />
           <h1 className="text-3xl font-semibold tracking-normal">Hoàn tất hồ sơ studio</h1>
           <p className="mt-3 text-sm leading-6 text-zinc-300">
             Email social đã xác thực. Cập nhật thông tin còn lại để bảo vệ tài khoản và vào dashboard.

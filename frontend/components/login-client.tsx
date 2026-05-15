@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { normalizeCallbackUrl } from '@/lib/callback-url'
+import { StudioLogoMark } from '@/components/studio-logo'
 
 export default function LoginClient() {
   const [activeTab, setActiveTab] = useState('login')
@@ -233,9 +234,7 @@ export default function LoginClient() {
       <div className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-3xl border bg-background/80 p-8 shadow-2xl shadow-black/5 backdrop-blur">
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-              <Lock className="h-6 w-6" />
-            </div>
+            <StudioLogoMark className="h-14 w-14 rounded-2xl" priority sizes="56px" />
             <div>
               <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Studio Pro</p>
               <h1 className="text-2xl font-semibold">Quản trị dashboard</h1>

@@ -1,4 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { buildBackendUrl } from '@/lib/backend-api'
+
+const RETRY_DELAYS_MS = [250, 750, 1500, 3000]
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isRetriableConnectionError(error: any) {
+  const message = String(error?.message || error || '')
+  return (
+    error instanceof TypeError ||
+    /fetch failed|ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ETIMEDOUT/i.test(message)
+  )
+}
+
+async function fetchBackend(
+  targetUrl: string,
+  init: RequestInit & { next?: { revalidate: number } }
+) {
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fetch(targetUrl, init)
+    } catch (error) {
+      if (attempt === RETRY_DELAYS_MS.length || !isRetriableConnectionError(error)) {
+        throw error
+      }
+
+      console.warn(
+        `[AI Proxy] Backend not ready, retrying ${attempt + 1}/${RETRY_DELAYS_MS.length}`
+      )
+      await sleep(RETRY_DELAYS_MS[attempt])
+    }
+  }
+
+  throw new Error('Unable to reach AI Backend')
+}
 
 export async function GET(
   request: NextRequest,
@@ -28,9 +65,7 @@ async function handleRequest(
 ) {
   const path = params.path.join('/')
   const searchParams = request.nextUrl.searchParams.toString()
-  const backendUrl = process.env.NEXT_PUBLIC_AI_BACKEND_URL || 'http://127.0.0.1:8000'
-  
-  const targetUrl = `${backendUrl}/${path}${searchParams ? `?${searchParams}` : ''}`
+  const targetUrl = buildBackendUrl(`/${path}${searchParams ? `?${searchParams}` : ''}`)
   console.log(`[AI Proxy] ${method} -> ${targetUrl}`)
 
   try {
@@ -38,12 +73,12 @@ async function handleRequest(
     if (['POST', 'PUT', 'PATCH'].includes(method)) {
       try {
         body = JSON.stringify(await request.json())
-      } catch (e) {
+      } catch {
         // No body or invalid JSON
       }
     }
 
-    const res = await fetch(targetUrl, {
+    const res = await fetchBackend(targetUrl, {
       method: method,
       headers: {
         'Content-Type': 'application/json',

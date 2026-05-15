@@ -38,6 +38,7 @@ import { PhotoCard } from '@/components/photo-card'
 import { Lightbox } from '@/components/lightbox'
 import { CommentModal } from '@/components/comment-modal'
 import { ComparisonViewer } from '@/components/comparison-viewer'
+import { StudioLogo } from '@/components/studio-logo'
 import { getCloudinaryThumbnail } from '@/lib/cloudinary'
 import { cn } from '@/lib/utils'
 import type { Photo } from '@/lib/types'
@@ -290,8 +291,10 @@ export function ClientGallery({ token }: { token?: string }) {
       <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur py-3 px-4">
         <div className="mx-auto max-w-7xl flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 shrink-0">
-            <Camera className="h-6 w-6" />
-            <span className="text-lg font-bold">Studio Pro</span>
+            <StudioLogo
+              markClassName="h-8 w-8 rounded-xl"
+              textClassName="font-bold"
+            />
           </div>
 
           <div className="flex-1 flex justify-end items-center gap-2">

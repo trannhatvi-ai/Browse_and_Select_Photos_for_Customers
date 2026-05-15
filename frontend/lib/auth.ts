@@ -3,7 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import FacebookProvider from 'next-auth/providers/facebook'
 import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from '@/lib/db'
-import { getPhoneLookupCandidates } from '@/lib/auth-verification'
+import { getPhoneLookupCandidates, normalizeEmail } from '@/lib/auth-verification'
 import bcrypt from 'bcryptjs'
 
 type OAuthRuntimeConfig = {
@@ -54,16 +54,34 @@ async function getOrCreateSocialUser({
   providerAccountId?: string | null
 }) {
   const providerIdField = provider === 'google' ? 'googleId' : 'facebookId'
+  const normalizedEmail = normalizeEmail(email)
   const existingByProviderId = providerAccountId
     ? await prisma.user.findUnique({ where: { [providerIdField]: providerAccountId } as any })
     : null
-  const existing = existingByProviderId ?? await prisma.user.findUnique({ where: { email } })
+  const existingByEmail = await prisma.user.findFirst({
+    where: {
+      email: { equals: normalizedEmail, mode: 'insensitive' },
+    } as any,
+  })
+  const existingAdmin =
+    existingByEmail?.role === 'ADMIN' ? existingByEmail :
+    existingByProviderId?.role === 'ADMIN' ? existingByProviderId :
+    null
+  const existing = existingAdmin ?? existingByProviderId ?? existingByEmail
 
   if (existing) {
+    const providerIdBelongsToAnotherUser = Boolean(
+      providerAccountId && existingByProviderId && existingByProviderId.id !== existing.id
+    )
+    const existingProviderId = (existing as any)[providerIdField]
+    const providerIdUpdate = existingProviderId || (
+      providerIdBelongsToAnotherUser ? undefined : providerAccountId || undefined
+    )
+
     return prisma.user.update({
       where: { id: existing.id },
       data: {
-        [providerIdField]: (existing as any)[providerIdField] || providerAccountId || undefined,
+        ...(providerIdUpdate ? { [providerIdField]: providerIdUpdate } : {}),
         emailVerifiedAt: existing.emailVerifiedAt || new Date(),
         authProvider: existing.authProvider === 'credentials' && existing.password ? existing.authProvider : provider,
       } as any,
@@ -73,9 +91,9 @@ async function getOrCreateSocialUser({
 
   return prisma.user.create({
     data: {
-      email,
-      name: name || email.split('@')[0],
-      username: await createUniqueUsername(email),
+      email: normalizedEmail,
+      name: name || normalizedEmail.split('@')[0],
+      username: await createUniqueUsername(normalizedEmail),
       password: null,
       role: 'STUDIO',
       authProvider: provider,

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, LogOut, Phone, ShieldCheck } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 import { normalizeCallbackUrl } from '@/lib/callback-url'
+import { StudioLogoMark } from '@/components/studio-logo'
 
 function CompletePhoneContent() {
   const router = useRouter()
@@ -76,9 +77,7 @@ function CompletePhoneContent() {
     <main className="min-h-screen bg-zinc-950 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
         <div className="mb-8">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500 text-zinc-950">
-            <ShieldCheck className="h-6 w-6" aria-hidden="true" />
-          </div>
+          <StudioLogoMark className="mb-4 h-12 w-12 rounded-xl ring-white/10" priority sizes="48px" />
           <h1 className="text-3xl font-semibold tracking-normal">Xác thực số điện thoại</h1>
           <p className="mt-3 text-sm leading-6 text-zinc-300">
             Mỗi tài khoản cần một số điện thoại Việt Nam duy nhất trước khi vào dashboard.
